@@ -135,3 +135,15 @@ export interface VisualAnalysisResponse {
 }
 
 export type AnalysisResult = StrategyResponse | MarketPulseResponse | QuickResponse | VisualAnalysisResponse;
+
+export interface ConceptHistoryItem {
+  id: string;
+  conceptTitle: string;
+  subtitle?: string;
+  timestamp: number;
+  analysisMode: AnalysisMode;
+  userInput: string;
+  analysisResult: AnalysisResult;
+  logoImageUrl: string | null;
+  score?: number;
+}

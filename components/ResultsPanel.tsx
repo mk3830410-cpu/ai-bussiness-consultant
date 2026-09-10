@@ -1,11 +1,14 @@
 
 import React, { useState, useRef, useMemo, FC } from 'react';
 import { AnalysisResult, AnalysisMode, StrategyResponse, MarketPulseResponse, QuickResponse, VisualAnalysisResponse, CustomerPersona, PricingModel, PitchDeckSlide, LegalInsight, CustomerJourneyStage, MonetizationStrategy, Comment } from '../types';
-import { Target, Users, Gem, Zap, Lightbulb, Bot, Image as ImageIcon, ChevronDown, FileText, Briefcase, BarChart, Palette, Type as TypeIcon, UserCheck, Shield, Globe, Star, Link as LinkIcon, BrainCircuit, Search, Eye, TrendingUp, Megaphone, ShoppingCart, Heart, Repeat, Map, CheckCircle, Download, DollarSign, Linkedin, X, CheckSquare, ExternalLink, MessageSquare, Edit2, Save, Share2 } from 'lucide-react';
+import { Target, Users, Gem, Zap, Lightbulb, Bot, Image as ImageIcon, ChevronDown, FileText, Briefcase, BarChart, Palette, Type as TypeIcon, UserCheck, Shield, Globe, Star, Link as LinkIcon, BrainCircuit, Search, Eye, TrendingUp, Megaphone, ShoppingCart, Heart, Repeat, Map, CheckCircle, Download, DollarSign, Linkedin, X, CheckSquare, ExternalLink, MessageSquare, Edit2, Save, Share2, Copy, Check, FileDown, Sparkles } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { createPortal } from 'react-dom';
 import { CommentSection } from './CollaborationTools';
+import { FinancialCharts } from './FinancialCharts';
+import { useToast } from './Toast';
+import { exportStrategyToPdf } from '../services/pdfExportService';
 
 // --- PDF Export Modal Component ---
 interface ExportPdfModalProps {
@@ -90,6 +93,7 @@ interface PrintableReportProps {
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
+  const { showToast } = useToast();
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   
@@ -110,6 +114,30 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
         { id: 'pitchDeck', title: 'Pitch Deck Outline', icon: <Briefcase size={16}/> },
         { id: 'legalInsights', title: 'Legal Insights', icon: <Shield size={16}/> },
   ], []);
+
+  const handleDownloadPdfDirect = async () => {
+    if (!props.analysisResult) return;
+    setIsExportingPDF(true);
+    try {
+      const resObj = props.analysisResult as any;
+      const title =
+        resObj?.brandIdentity?.companyNameSuggestions?.[0] ||
+        resObj?.branding?.companyNameSuggestions?.[0] ||
+        'StratIQ Strategy Report';
+      await exportStrategyToPdf({
+        result: props.analysisResult,
+        mode: props.analysisMode,
+        logoImageUrl: props.logoImageUrl,
+        conceptTitle: title,
+      });
+      showToast('Export successful! Downloaded StratIQ Strategy Report (PDF)', 'success', 'download');
+    } catch (err: any) {
+      console.error('PDF export failed:', err);
+      showToast('Failed to export PDF: ' + (err?.message || 'Unknown error'), 'error');
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   const handleInitiatePdfExport = () => {
       if (props.analysisMode === 'deep') {
@@ -144,7 +172,6 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
     `;
     document.head.appendChild(style);
 
-
     try {
       const canvas = await html2canvas(printableRef.current, {
         scale: 2,
@@ -175,11 +202,13 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
         heightLeft -= pdfHeight;
       }
       
-      const fileName = `StratIQ_${props.analysisMode}_Report.pdf`;
+      const fileName = `StratIQ_${props.analysisMode}_Custom_Report.pdf`;
       pdf.save(fileName);
+      showToast('Export successful! Custom PDF report downloaded.', 'success', 'download');
 
     } catch (error) {
       console.error("Failed to export PDF:", error);
+      showToast('Failed to export PDF', 'error');
     } finally {
       setIsExportingPDF(false);
       document.head.removeChild(style);
@@ -188,13 +217,46 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
 
   const handleExportCSV = () => {
     if (!props.analysisResult) return;
-    const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
-      JSON.stringify(props.analysisResult, null, 2)
-    )}`;
-    const link = document.createElement("a");
-    link.href = jsonString;
-    link.download = `StratIQ_${props.analysisMode}_data.json`;
-    link.click();
+    try {
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(props.analysisResult, null, 2)
+      )}`;
+      const link = document.createElement("a");
+      link.href = jsonString;
+      link.download = `StratIQ_${props.analysisMode}_data.json`;
+      link.click();
+      showToast('Export successful! JSON data downloaded.', 'success', 'download');
+    } catch (err) {
+      showToast('Failed to export JSON data', 'error');
+    }
+  };
+
+  const handleCopySummary = () => {
+    if (!props.analysisResult) return;
+    const res = props.analysisResult as any;
+    let textToCopy = '';
+    if (props.analysisMode === 'deep') {
+      const deep = res as StrategyResponse;
+      const companyName = deep.brandIdentity?.companyNameSuggestions?.[0] || 'Startup Concept';
+      textToCopy = `StratIQ Strategy Report: ${companyName}\n` +
+        `Validation Score: ${deep.ideaValidation?.score}/10\n` +
+        `Executive Summary: ${deep.ideaValidation?.justification}\n\n` +
+        `Target Audience: ${deep.marketAnalysis?.targetAudience}\n` +
+        `Unique Selling Proposition: ${deep.marketAnalysis?.uniqueSellingProposition}\n\n` +
+        `Top Recommendations:\n${deep.ideaValidation?.suggestions?.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+    } else if (props.analysisMode === 'market') {
+      const market = res as MarketPulseResponse;
+      textToCopy = `StratIQ Market Pulse\nSummary: ${market.marketSummary}\n\nEmerging Trends:\n${market.emergingTrends?.map(t => `- ${t}`).join('\n')}`;
+    } else if (props.analysisMode === 'quick') {
+      const quick = res as QuickResponse;
+      textToCopy = `StratIQ Quick Brainstorm\nScore: ${quick.ideaValidation?.score}/10\n${quick.ideaValidation?.justification}\n\nKey Strategies:\n${quick.keyStrategies?.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+    } else {
+      const vis = res as VisualAnalysisResponse;
+      textToCopy = `StratIQ Visual Spark\n${vis.analysis}\n\nSuggestions:\n${vis.suggestions?.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+    }
+
+    navigator.clipboard.writeText(textToCopy);
+    showToast('Copied strategy summary to clipboard!', 'success', 'copy');
   };
   
   const toggleComments = (sectionId: string) => {
@@ -258,19 +320,34 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
         <currentMode.icon className="h-10 w-10 mx-auto text-indigo-400" />
         <h2 className="text-3xl font-extrabold text-white mt-2">{currentMode.title}</h2>
         <p className="text-gray-400 mt-1">Your AI-powered analysis is ready.</p>
-        <div className="absolute top-0 right-0 mt-2 mr-2 flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5 mt-4 sm:mt-0 sm:absolute sm:top-0 sm:right-0">
            <button
+             id="copy-summary-btn"
+             onClick={handleCopySummary}
+             className="inline-flex items-center justify-center px-3.5 py-2 text-xs md:text-sm font-semibold text-gray-200 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-750 hover:text-white hover:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all"
+             title="Copy executive summary to clipboard"
+           >
+             <Copy size={15} className="mr-1.5 text-indigo-400" />
+             Copy Summary
+           </button>
+
+           <button
+             id="export-json-btn"
              onClick={handleExportCSV}
              disabled={isExportingPDF}
-             className="hidden sm:inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-gray-600 rounded-lg hover:bg-gray-700 disabled:bg-gray-500 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-gray-500/50 transition-all duration-300"
+             className="hidden sm:inline-flex items-center justify-center px-3.5 py-2 text-xs md:text-sm font-semibold text-gray-200 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-750 hover:text-white hover:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all"
+             title="Download analysis data as JSON"
            >
-             <Download size={16} className="mr-2" />
+             <Download size={15} className="mr-1.5 text-gray-400" />
              Export JSON
            </button>
+
            <button
-             onClick={handleInitiatePdfExport}
+             id="download-pdf-btn"
+             onClick={handleDownloadPdfDirect}
              disabled={isExportingPDF}
-             className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all duration-300"
+             className="inline-flex items-center justify-center px-4 py-2 text-xs md:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-550 active:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed shadow-lg shadow-indigo-900/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/40 transition-all"
+             title="Download full business strategy report as PDF"
            >
              {isExportingPDF ? (
                <>
@@ -278,15 +355,26 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                  </svg>
-                 <span>Exporting...</span>
+                 <span>Generating PDF...</span>
                </>
              ) : (
                <>
-                 <Download size={16} className="mr-2" />
-                 Export PDF
+                 <FileDown size={16} className="mr-2" />
+                 Download as PDF
                </>
              )}
            </button>
+
+           {props.analysisMode === 'deep' && (
+             <button
+               onClick={handleInitiatePdfExport}
+               disabled={isExportingPDF}
+               className="hidden lg:inline-flex text-xs text-gray-400 hover:text-indigo-300 underline px-1 py-1"
+               title="Customize which sections appear in the PDF"
+             >
+               Custom...
+             </button>
+           )}
         </div>
       </div>
       <div className="space-y-8">
@@ -339,6 +427,7 @@ interface AccordionProps {
   defaultOpen?: boolean;
   isPrintable?: boolean;
   sectionId?: string;
+  onCopySection?: () => void;
   context?: {
       isCollaborative: boolean;
       onCommentClick: (id: string) => void;
@@ -347,7 +436,7 @@ interface AccordionProps {
   };
 }
 
-const AccordionSection: React.FC<AccordionProps> = ({ icon, title, children, defaultOpen = false, isPrintable = false, sectionId, context }) => {
+const AccordionSection: React.FC<AccordionProps> = ({ icon, title, children, defaultOpen = false, isPrintable = false, sectionId, onCopySection, context }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -374,32 +463,48 @@ const AccordionSection: React.FC<AccordionProps> = ({ icon, title, children, def
           <ChevronDown className={`transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} size={16} />
         </button>
         
-        {/* Collaboration Tools */}
-        {sectionId && !isPrintable && (
-            <div className="flex items-center gap-2">
-                {context?.isCollaborative && (
-                    <button 
-                        onClick={() => setIsEditing(!isEditing)}
-                        className={`p-1.5 rounded-lg transition-colors ${isEditing ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-                        title="Edit Section"
-                    >
-                        {isEditing ? <Save size={16} /> : <Edit2 size={16} />}
-                    </button>
-                )}
-                <button 
-                    onClick={() => context?.onCommentClick(sectionId)}
-                    className={`p-1.5 rounded-lg transition-colors relative ${context?.activeComments === sectionId ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-                    title="Comments"
+        {/* Actions: Copy & Collaboration Tools */}
+        <div className="flex items-center gap-1.5">
+            {onCopySection && !isPrintable && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onCopySection();
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                    title="Copy section to clipboard"
+                    aria-label={`Copy ${title}`}
                 >
-                    <MessageSquare size={16} />
-                    {commentCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-3.5 h-3.5 flex items-center justify-center rounded-full">
-                            {commentCount}
-                        </span>
-                    )}
+                    <Copy size={16} />
                 </button>
-            </div>
-        )}
+            )}
+
+            {sectionId && !isPrintable && (
+                <>
+                    {context?.isCollaborative && (
+                        <button 
+                            onClick={() => setIsEditing(!isEditing)}
+                            className={`p-1.5 rounded-lg transition-colors ${isEditing ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
+                            title="Edit Section"
+                        >
+                            {isEditing ? <Save size={16} /> : <Edit2 size={16} />}
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => context?.onCommentClick(sectionId)}
+                        className={`p-1.5 rounded-lg transition-colors relative ${context?.activeComments === sectionId ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
+                        title="Comments"
+                    >
+                        <MessageSquare size={16} />
+                        {commentCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-3.5 h-3.5 flex items-center justify-center rounded-full">
+                                {commentCount}
+                            </span>
+                        )}
+                    </button>
+                </>
+            )}
+        </div>
       </div>
       
       {isOpen && (
@@ -443,7 +548,8 @@ interface DeepDiveProps {
 }
 
 const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLogoLoading, isPrintable = false, context }) => {
-    
+    const { showToast } = useToast();
+
     const handleLinkedInShare = (slide: PitchDeckSlide) => {
         const title = slide.title;
         const summary = slide.content.join('\n\n') + `\n\n- Generated by StratIQ`;
@@ -456,7 +562,19 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
 
     return (
     <div className="space-y-6">
-        <AccordionSection sectionId="ideaValidation" icon={<Star size={20}/>} title="Idea Validation & Suggestions" defaultOpen={true} isPrintable={isPrintable} context={context}>
+        <AccordionSection 
+            sectionId="ideaValidation" 
+            icon={<Star size={20}/>} 
+            title="Idea Validation & Suggestions" 
+            defaultOpen={true} 
+            isPrintable={isPrintable} 
+            context={context}
+            onCopySection={() => {
+                const text = `Idea Validation: ${strategy.ideaValidation.score}/10\n${strategy.ideaValidation.justification}\n\nImprovement Suggestions:\n${strategy.ideaValidation.suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+                navigator.clipboard.writeText(text);
+                showToast('Idea validation copied to clipboard!', 'success', 'copy');
+            }}
+        >
             <div className="flex items-center gap-4 p-4 bg-gray-900 rounded-lg mb-4">
                 <div className="text-4xl font-bold text-indigo-400">{strategy.ideaValidation.score}/10</div>
                 <div>
@@ -467,7 +585,18 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
             <h4 className="font-bold text-indigo-400 mb-2">Improvement Suggestions:</h4>
             <ul className="list-disc list-outside pl-5 space-y-2">{strategy.ideaValidation.suggestions.map((tip, i) => <li key={i}>{tip}</li>)}</ul>
         </AccordionSection>
-        <AccordionSection sectionId="marketAnalysis" icon={<BarChart size={20}/>} title="Market & Competitor Analysis" isPrintable={isPrintable} context={context}>
+        <AccordionSection 
+            sectionId="marketAnalysis" 
+            icon={<BarChart size={20}/>} 
+            title="Market & Competitor Analysis" 
+            isPrintable={isPrintable} 
+            context={context}
+            onCopySection={() => {
+                const text = `Target Audience: ${strategy.marketAnalysis.targetAudience}\n\nUnique Selling Proposition: ${strategy.marketAnalysis.uniqueSellingProposition}\n\nCompetitors:\n${strategy.marketAnalysis.competitors.map(c => `• ${c.name}: ${c.analysis}`).join('\n')}`;
+                navigator.clipboard.writeText(text);
+                showToast('Market analysis copied to clipboard!', 'success', 'copy');
+            }}
+        >
             <div className="space-y-4">
                 <div><h4 className="font-bold text-indigo-400">Target Audience:</h4><p>{strategy.marketAnalysis.targetAudience}</p></div>
                 <div><h4 className="font-bold text-indigo-400">Unique Selling Proposition:</h4><p>{strategy.marketAnalysis.uniqueSellingProposition}</p></div>
@@ -490,27 +619,48 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                 </div>
             </div>
         </AccordionSection>
-         <AccordionSection sectionId="financialProjections" icon={<TrendingUp size={20}/>} title="Financial Projections (1-3 Years)" isPrintable={isPrintable} context={context}>
-            <div className="space-y-4">
-                {strategy.financialProjections.map((proj, i) => (
-                    <div key={i} className="p-4 bg-gray-900/70 rounded-lg border border-gray-700">
-                        <h4 className="text-lg font-bold text-white mb-2">Year {proj.year}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                            <div className="flex justify-between border-b border-gray-700 pb-1">
-                                <span className="text-gray-400">Projected Revenue:</span>
-                                <span className="font-semibold text-green-400">{proj.revenue}</span>
+         <AccordionSection 
+            sectionId="financialProjections" 
+            icon={<TrendingUp size={20}/>} 
+            title="Financial Projections (1-3 Years)" 
+            defaultOpen={true}
+            isPrintable={isPrintable} 
+            context={context}
+            onCopySection={() => {
+                const text = strategy.financialProjections.map(p => `Year ${p.year}:\n• Projected Revenue: ${p.revenue}\n• Projected Costs: ${p.costs}\n• Assumptions: ${p.assumptions}`).join('\n\n');
+                navigator.clipboard.writeText(text);
+                showToast('Financial projections copied to clipboard!', 'success', 'copy');
+            }}
+        >
+            <div className="space-y-6">
+                {!isPrintable && (
+                    <FinancialCharts projections={strategy.financialProjections} />
+                )}
+
+                <div>
+                    <h4 className="text-sm font-bold text-gray-300 mb-3">Annual Breakdown & Assumptions</h4>
+                    <div className="space-y-4">
+                        {strategy.financialProjections.map((proj, i) => (
+                            <div key={i} className="p-4 bg-gray-900/70 rounded-lg border border-gray-700">
+                                <h4 className="text-lg font-bold text-white mb-2">Year {proj.year}</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                    <div className="flex justify-between border-b border-gray-700 pb-1">
+                                        <span className="text-gray-400">Projected Revenue:</span>
+                                        <span className="font-semibold text-green-400">{proj.revenue}</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-700 pb-1">
+                                        <span className="text-gray-400">Projected Costs:</span>
+                                        <span className="font-semibold text-red-400">{proj.costs}</span>
+                                    </div>
+                                    <div className="md:col-span-2 mt-2">
+                                        <p className="text-gray-400 text-xs">Assumptions:</p>
+                                        <p className="text-gray-300">{proj.assumptions}</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex justify-between border-b border-gray-700 pb-1">
-                                <span className="text-gray-400">Projected Costs:</span>
-                                <span className="font-semibold text-red-400">{proj.costs}</span>
-                            </div>
-                            <div className="md:col-span-2 mt-2">
-                                <p className="text-gray-400 text-xs">Assumptions:</p>
-                                <p className="text-gray-300">{proj.assumptions}</p>
-                            </div>
-                        </div>
+                        ))}
                     </div>
-                ))}
+                </div>
             </div>
         </AccordionSection>
         
@@ -610,7 +760,18 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
             </ul>
         </AccordionSection>
         
-        <AccordionSection sectionId="pricingModels" icon={<ShoppingCart size={20}/>} title="Pricing Models" isPrintable={isPrintable} context={context}>
+        <AccordionSection 
+            sectionId="pricingModels" 
+            icon={<ShoppingCart size={20}/>} 
+            title="Pricing Models" 
+            isPrintable={isPrintable} 
+            context={context}
+            onCopySection={() => {
+                const text = strategy.pricingModels.map(m => `${m.name} (for ${m.targetCustomer}): ${m.description}\nFeatures: ${m.keyFeatures.join(', ')}\nPros: ${m.pros.join(', ')}\nCons: ${m.cons.join(', ')}`).join('\n\n');
+                navigator.clipboard.writeText(text);
+                showToast('Pricing models copied to clipboard!', 'success', 'copy');
+            }}
+        >
             <div className="space-y-4">
                 {strategy.pricingModels.map((model: PricingModel, i: number) => (
                     <div key={i} className="p-4 bg-gray-900/70 rounded-lg border border-gray-700">
@@ -627,7 +788,18 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
             </div>
         </AccordionSection>
         
-        <AccordionSection sectionId="monetizationPlan" icon={<DollarSign size={20}/>} title="Monetization Plan" isPrintable={isPrintable} context={context}>
+        <AccordionSection 
+            sectionId="monetizationPlan" 
+            icon={<DollarSign size={20}/>} 
+            title="Monetization Plan" 
+            isPrintable={isPrintable} 
+            context={context}
+            onCopySection={() => {
+                const text = strategy.monetizationPlan.map(p => `${p.name}: ${p.description}\nStreams: ${p.revenueStreams.join(', ')}\nJustification: ${p.justification}`).join('\n\n');
+                navigator.clipboard.writeText(text);
+                showToast('Monetization plan copied to clipboard!', 'success', 'copy');
+            }}
+        >
             <div className="space-y-4">
                 {strategy.monetizationPlan.map((plan: MonetizationStrategy, i: number) => (
                     <div key={i} className="p-4 bg-gray-900/70 rounded-lg border border-gray-700">
@@ -648,16 +820,40 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
             </div>
         </AccordionSection>
         
-        <AccordionSection sectionId="pitchDeck" icon={<Briefcase size={20}/>} title="Pitch Deck Outline" isPrintable={isPrintable} context={context}>
+        <AccordionSection 
+            sectionId="pitchDeck" 
+            icon={<Briefcase size={20}/>} 
+            title="Pitch Deck Outline" 
+            isPrintable={isPrintable} 
+            context={context}
+            onCopySection={() => {
+                const text = strategy.pitchDeck.map((s, idx) => `Slide ${idx + 1}: ${s.title}\n${s.content.map(c => `• ${c}`).join('\n')}\nNotes: ${s.speakerNotes}`).join('\n\n');
+                navigator.clipboard.writeText(text);
+                showToast('Full pitch deck copied to clipboard!', 'success', 'copy');
+            }}
+        >
             <div className="space-y-4">
                 {strategy.pitchDeck.map((slide: PitchDeckSlide, i: number) => (
                     <div key={i} className="bg-gray-900/70 p-4 rounded-lg border border-gray-700">
                         <div className="flex justify-between items-start mb-2">
                             <h4 className="text-lg font-bold text-white">Slide {i + 1}: {slide.title}</h4>
                             {!isPrintable && (
-                                <button onClick={() => handleLinkedInShare(slide)} title="Share Slide on LinkedIn" className="text-indigo-400 hover:text-white transition-colors">
-                                    <Linkedin size={18} />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const slideText = `Slide ${i + 1}: ${slide.title}\n\n${slide.content.map(c => `• ${c}`).join('\n')}\n\nSpeaker Notes: ${slide.speakerNotes}`;
+                                            navigator.clipboard.writeText(slideText);
+                                            showToast(`Slide ${i + 1} copied to clipboard!`, 'success', 'copy');
+                                        }}
+                                        title="Copy Slide Content"
+                                        className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                                    >
+                                        <Copy size={16} />
+                                    </button>
+                                    <button onClick={() => handleLinkedInShare(slide)} title="Share Slide on LinkedIn" className="p-1 rounded text-indigo-400 hover:text-white hover:bg-gray-800 transition-colors">
+                                        <Linkedin size={18} />
+                                    </button>
+                                </div>
                             )}
                         </div>
                         <ul className="list-disc list-outside pl-5 mb-3 text-gray-300">

@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { AnalysisResult, AnalysisMode, SubscriptionTier, TeamMember, Comment } from './types';
+import { AnalysisResult, AnalysisMode, SubscriptionTier, TeamMember, Comment, ConceptHistoryItem } from './types';
 import { generateStrategy, generateLogoImage } from './services/geminiService';
 import InputPanel from './components/InputPanel';
 import ResultsPanel from './components/ResultsPanel';
@@ -15,6 +15,8 @@ import { Session, User } from '@supabase/supabase-js';
 import { trackEvent } from './services/analytics';
 import { Users } from 'lucide-react';
 import { TeamModal } from './components/CollaborationTools';
+import { ToastProvider, useToast } from './components/Toast';
+import { ConceptHistory } from './components/ConceptHistory';
 
 interface Profile {
   full_name: string;
@@ -23,7 +25,8 @@ interface Profile {
   subscription_tier: SubscriptionTier;
 }
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { showToast } = useToast();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -40,6 +43,17 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLogoLoading, setIsLogoLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Concept History State (keeps last 3 concepts)
+  const [conceptHistory, setConceptHistory] = useState<ConceptHistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('stratiq_concept_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [activeConceptId, setActiveConceptId] = useState<string | null>(null);
 
   const [view, setView] = useState<'main' | 'settings'>('main');
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -148,14 +162,62 @@ const App: React.FC = () => {
     try {
       const result = await generateStrategy(analysisMode, userInput, image);
       setAnalysisResult(result);
+      showToast('Strategy generated successfully!', 'success');
       
+      // Build history item to save the last 3 business concepts
+      const conceptTitle =
+        (result as any)?.brandIdentity?.companyNameSuggestions?.[0] ||
+        (result as any)?.branding?.companyNameSuggestions?.[0] ||
+        userInput.split('\n')[0].substring(0, 45).trim() ||
+        'Business Concept';
+      const subtitle =
+        (result as any)?.brandIdentity?.sloganSuggestions?.[0] ||
+        (result as any)?.marketAnalysis?.uniqueSellingProposition ||
+        (result as any)?.marketSummary ||
+        userInput.substring(0, 90).trim();
+      const score = (result as any)?.ideaValidation?.score;
+      const newId = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+
+      const newItem: ConceptHistoryItem = {
+        id: newId,
+        conceptTitle,
+        subtitle,
+        timestamp: Date.now(),
+        analysisMode,
+        userInput,
+        analysisResult: result,
+        logoImageUrl: null,
+        score,
+      };
+
+      setConceptHistory((prev) => {
+        const updated = [newItem, ...prev.filter(item => item.id !== newId)].slice(0, 3);
+        try {
+          localStorage.setItem('stratiq_concept_history', JSON.stringify(updated));
+        } catch (e) {
+          console.warn('Failed to save concept history to localStorage', e);
+        }
+        return updated;
+      });
+      setActiveConceptId(newId);
+
       const logoConcept = (result as any)?.brandIdentity?.logoConcept || (result as any)?.branding?.logoConcept;
 
       if (logoConcept) {
         setIsLogoLoading(true);
         try {
           const base64Image = await generateLogoImage(logoConcept);
-          setLogoImageUrl(`data:image/jpeg;base64,${base64Image}`);
+          const fullLogoUrl = `data:image/jpeg;base64,${base64Image}`;
+          setLogoImageUrl(fullLogoUrl);
+
+          // Update the saved history item with the generated logo
+          setConceptHistory((prev) => {
+            const updated = prev.map(item => item.id === newId ? { ...item, logoImageUrl: fullLogoUrl } : item);
+            try {
+              localStorage.setItem('stratiq_concept_history', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
         } catch (logoError) {
           console.error('Logo generation failed:', logoError);
         } finally {
@@ -165,11 +227,31 @@ const App: React.FC = () => {
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      showToast(err instanceof Error ? err.message : 'Strategy generation failed', 'error');
       trackEvent('generate_error', 'User', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
-  }, [userInput, analysisMode, image, isVerified]);
+  }, [userInput, analysisMode, image, isVerified, showToast]);
+
+  const handleSelectConcept = (item: ConceptHistoryItem) => {
+    setActiveConceptId(item.id);
+    setAnalysisResult(item.analysisResult);
+    setAnalysisMode(item.analysisMode);
+    setUserInput(item.userInput);
+    setLogoImageUrl(item.logoImageUrl);
+    setError(null);
+    showToast(`Loaded "${item.conceptTitle}" from history`, 'info');
+  };
+
+  const handleClearHistory = () => {
+    setConceptHistory([]);
+    setActiveConceptId(null);
+    try {
+      localStorage.removeItem('stratiq_concept_history');
+    } catch {}
+    showToast('Concept history cleared', 'info');
+  };
 
   const handleModeChange = (mode: AnalysisMode) => {
     setAnalysisMode(mode);
@@ -279,6 +361,13 @@ const App: React.FC = () => {
               )}
             </div>
 
+            <ConceptHistory 
+              history={conceptHistory}
+              activeId={activeConceptId}
+              onSelectConcept={handleSelectConcept}
+              onClearHistory={handleClearHistory}
+            />
+
             <ResultsPanel 
               analysisResult={analysisResult}
               logoImageUrl={logoImageUrl}
@@ -302,6 +391,14 @@ const App: React.FC = () => {
         <p>Powered by Gemini API | Plan: <span className="uppercase text-indigo-400">{profile.subscription_tier}</span></p>
       </footer>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 };
 

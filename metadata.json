@@ -2,5 +2,7 @@
   "name": "StratIQ: The AI Business Co-Founder",
   "description": "Upload or describe your startup idea, and StratIQ acts as your AI co-founder, crafting personalized business strategies, generating branding assets, financial projections, pitch decks, and performing market analysis.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
