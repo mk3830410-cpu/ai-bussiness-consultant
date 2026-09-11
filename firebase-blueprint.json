@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile document containing account and profile metadata.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 256 },
+        "photoURL": { "type": "string", "maxLength": 1024 },
+        "emailVerified": { "type": "boolean" },
+        "provider": { "type": "string", "maxLength": 50 },
+        "subscriptionPlan": { "type": "string", "maxLength": 50 },
+        "role": { "type": "string", "maxLength": 50 },
+        "onboardingCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Strategy": {
+      "title": "Strategy",
+      "description": "Saved AI business strategy blueprint generated for a venture.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "businessName": { "type": "string", "maxLength": 200 },
+        "industry": { "type": "string", "maxLength": 100 },
+        "mode": { "type": "string", "maxLength": 50 },
+        "score": { "type": "number" },
+        "status": { "type": "string", "maxLength": 50 },
+        "result": { "type": "object" },
+        "inputs": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "businessName"]
+    },
+    "Analysis": {
+      "title": "Analysis",
+      "description": "Comprehensive business analysis record for an idea.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "businessName": { "type": "string", "maxLength": 200 },
+        "businessIdea": { "type": "string", "maxLength": 10000 },
+        "industry": { "type": "string", "maxLength": 100 },
+        "targetCustomer": { "type": "string", "maxLength": 500 },
+        "market": { "type": "string", "maxLength": 500 },
+        "businessModel": { "type": "string", "maxLength": 200 },
+        "goals": { "type": "string", "maxLength": 500 },
+        "analysis": { "type": "object" },
+        "scores": { "type": "object" },
+        "recommendations": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "businessName"]
+    },
+    "Idea": {
+      "title": "Idea",
+      "description": "Early stage business spark or idea stored in Idea Vault.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "industry": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "maxLength": 50 },
+        "notes": { "type": "string", "maxLength": 5000 },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Individual chat message with the AI Co-Founder Advisor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "maxLength": 20 },
+        "content": { "type": "string", "maxLength": 20000 },
+        "timestamp": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "role", "content"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preferences and workspace configuration.",
+      "type": "object",
+      "properties": {
+        "theme": { "type": "string", "maxLength": 50 },
+        "notifications": { "type": "boolean" },
+        "emailNotifications": { "type": "boolean" },
+        "defaultIndustry": { "type": "string", "maxLength": 100 },
+        "defaultMarket": { "type": "string", "maxLength": 100 },
+        "language": { "type": "string", "maxLength": 20 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Root user profile document containing user account metadata."
+    },
+    "/users/{userId}/strategies/{strategyId}": {
+      "schema": "Strategy",
+      "description": "Full saved AI venture strategies created by the user."
+    },
+    "/users/{userId}/analyses/{analysisId}": {
+      "schema": "Analysis",
+      "description": "Comprehensive business analysis logs."
+    },
+    "/users/{userId}/ideas/{ideaId}": {
+      "schema": "Idea",
+      "description": "Business Idea Vault items created by the user."
+    },
+    "/users/{userId}/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Persisted AI Advisor conversation messages."
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "UserSettings",
+      "description": "User personal preferences and workspace settings."
+    }
+  }
+}

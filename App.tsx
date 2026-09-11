@@ -1,36 +1,78 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
-import { AnalysisResult, AnalysisMode, SubscriptionTier, TeamMember, Comment, ConceptHistoryItem } from './types';
+import { 
+  AnalysisResult, 
+  AnalysisMode, 
+  SubscriptionTier, 
+  TeamMember, 
+  Comment, 
+  ConceptHistoryItem,
+  SavedStrategy,
+  BusinessIdeaItem,
+  WizardData
+} from './types';
 import { generateStrategy, generateLogoImage } from './services/geminiService';
 import InputPanel from './components/InputPanel';
 import ResultsPanel from './components/ResultsPanel';
-import { Header } from './components/Header';
+import { Header, AppNavTab } from './components/Header';
 import { Hero } from './components/Hero';
 import LandingPage from './components/LandingPage';
 import ProfileSettings from './components/ProfileSettings';
 import VerificationBanner from './components/VerificationBanner';
 import PricingPage from './components/PricingPage';
-import { supabase } from './services/supabaseClient';
-import { Session, User } from '@supabase/supabase-js';
+import { AuthProvider, useAuth } from './services/AuthContext';
+import { updateUserProfile } from './services/authService';
+import { OnboardingModal } from './components/OnboardingModal';
 import { trackEvent } from './services/analytics';
-import { Users } from 'lucide-react';
+import { Users, Sparkles, ArrowLeft, RefreshCw } from 'lucide-react';
 import { TeamModal } from './components/CollaborationTools';
 import { ToastProvider, useToast } from './components/Toast';
 import { ConceptHistory } from './components/ConceptHistory';
-
-interface Profile {
-  full_name: string;
-  role: string;
-  avatar_url: string;
-  subscription_tier: SubscriptionTier;
-}
+import { DashboardOverview } from './components/DashboardOverview';
+import { AnalysisWizard } from './components/AnalysisWizard';
+import { SavedStrategiesView } from './components/SavedStrategiesView';
+import { BusinessIdeasVault } from './components/BusinessIdeasVault';
+import { BusinessAdvisorChat } from './components/BusinessAdvisorChat';
+import { 
+  fetchUserStrategies, 
+  saveStrategyToFirestore, 
+  updateStrategyInFirestore, 
+  deleteStrategyFromFirestore, 
+  duplicateStrategyInFirestore, 
+  fetchUserIdeas, 
+  saveIdeaToFirestore, 
+  deleteIdeaFromFirestore 
+} from './services/firestoreService';
+import { 
+  getSavedStrategies, 
+  syncStrategiesWithLocal,
+  getSavedIdeas, 
+  syncIdeasWithLocal,
+  getDashboardStats 
+} from './services/strategyStorage';
+import { exportStrategyToPdf } from './services/pdfExportService';
+import { validateEnvironment } from './services/envValidation';
 
 const AppContent: React.FC = () => {
   const { showToast } = useToast();
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [isVerified, setIsVerified] = useState<boolean>(false);
+
+  // Validate Firebase & Analytics configuration upon app load
+  useEffect(() => {
+    validateEnvironment();
+  }, []);
+
+  const { 
+    user, 
+    userProfile, 
+    isAuthenticated, 
+    isEmailVerified, 
+    isAnonymous, 
+    isOnline, 
+    refreshProfile, 
+    refreshVerification 
+  } = useAuth();
+
+  // Active navigation tab
+  const [currentTab, setCurrentTab] = useState<AppNavTab>('dashboard');
 
   // App State
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('deep');
@@ -39,10 +81,14 @@ const AppContent: React.FC = () => {
   
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [logoImageUrl, setLogoImageUrl] = useState<string | null>(null);
+  const [activeStrategy, setActiveStrategy] = useState<SavedStrategy | null>(null);
   
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLogoLoading, setIsLogoLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Onboarding modal visibility
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
 
   // Concept History State (keeps last 3 concepts)
   const [conceptHistory, setConceptHistory] = useState<ConceptHistoryItem[]>(() => {
@@ -55,184 +101,226 @@ const AppContent: React.FC = () => {
   });
   const [activeConceptId, setActiveConceptId] = useState<string | null>(null);
 
-  const [view, setView] = useState<'main' | 'settings'>('main');
+  // Persistent storage state from Firestore
+  const [savedStrategies, setSavedStrategies] = useState<SavedStrategy[]>(() => getSavedStrategies(user?.uid));
+  const [savedIdeas, setSavedIdeas] = useState<BusinessIdeaItem[]>(() => getSavedIdeas(user?.uid));
+  const [wizardPrefill, setWizardPrefill] = useState<Partial<WizardData> | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+
   const [showTeamModal, setShowTeamModal] = useState(false);
 
   // Collaboration State
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
 
-  const fetchProfile = async (user: User | null) => {
-    if (user) {
+  // Load Firestore data whenever authenticated user changes
+  useEffect(() => {
+    if (!user) {
+      setSavedStrategies(getSavedStrategies());
+      setSavedIdeas(getSavedIdeas());
+      return;
+    }
+
+    let isMounted = true;
+    async function loadFirestoreData() {
+      setIsLoadingData(true);
       try {
-        const { data, error, status } = await supabase
-          .from('profiles')
-          .select(`full_name, role, avatar_url, subscription_tier`)
-          .eq('id', user.id)
-          .single();
-        
-        // Handle case where subscription_tier column might not exist in old schema by defaulting
-        if (error && status !== 406) {
-           // If column missing error, we just ignore and use default
-           console.warn("Could not fetch full profile:", error.message);
+        const [strategies, ideas] = await Promise.all([
+          fetchUserStrategies(user!.uid),
+          fetchUserIdeas(user!.uid),
+        ]);
+
+        if (isMounted) {
+          if (strategies && strategies.length > 0) {
+            setSavedStrategies(strategies);
+            syncStrategiesWithLocal(strategies, user!.uid);
+          }
+          if (ideas && ideas.length > 0) {
+            setSavedIdeas(ideas);
+            syncIdeasWithLocal(ideas, user!.uid);
+          }
         }
-        
-        if (data) {
-          setProfile(data as Profile);
-        } else {
-             // Basic fallback if profile doesn't exist yet
-             setProfile({ full_name: '', role: '', avatar_url: '', subscription_tier: null });
-        }
-      } catch (error: any) {
-        console.error('Error fetching profile:', error.message);
+      } catch (err) {
+        console.warn('Could not load initial data from Firestore:', err);
+      } finally {
+        if (isMounted) setIsLoadingData(false);
       }
     }
-  };
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsVerified(!!session?.user?.email_confirmed_at);
-      fetchProfile(session?.user ?? null);
-    });
+    loadFirestoreData();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsVerified(!!session?.user?.email_confirmed_at);
-      if (session?.user) {
-        fetchProfile(session.user);
-      } else {
-        setProfile(null);
-      }
+    // Check if onboarding needs to be shown for first-time signups
+    if (userProfile && userProfile.onboardingCompleted === false && !isAnonymous) {
+      setShowOnboarding(true);
+    } else {
+      setShowOnboarding(false);
+    }
 
-      if (_event === 'SIGNED_OUT') {
-        setAnalysisResult(null);
-        setUserInput('');
-        setImage(null);
-        setError(null);
-        setView('main');
-        setProfile(null);
-      }
-    });
+    return () => {
+      isMounted = false;
+    };
+  }, [user, userProfile, isAnonymous]);
 
-    return () => subscription.unsubscribe();
-  }, []);
+  // Derived real dashboard stats from active strategies & ideas
+  const overviewStats = getDashboardStats(user?.uid, savedStrategies, savedIdeas);
 
   const handleUpdatePlan = async (tier: SubscriptionTier) => {
-      if (!user) return;
-      
-      // Optimistic update for UI
-      setProfile(prev => prev ? { ...prev, subscription_tier: tier } : null);
-
-      try {
-          // Attempt to update Supabase
-          const { error } = await supabase.from('profiles').update({ subscription_tier: tier }).eq('id', user.id);
-          if (error) throw error;
-      } catch (err) {
-          console.error("Failed to sync plan to DB (might be schema mismatch), but continuing session.", err);
-      }
+    if (!user) return;
+    try {
+      await updateUserProfile(user.uid, { subscriptionPlan: tier });
+      await refreshProfile();
+      showToast(`Subscribed to ${tier.toUpperCase()} plan successfully!`, 'success');
+      setCurrentTab('dashboard');
+    } catch (err: any) {
+      showToast('Could not update plan: ' + err.message, 'error');
+    }
   };
 
-  const handleGenerate = useCallback(async () => {
-    const hasTextInput = userInput.trim();
-    const hasImageInput = !!image;
+  // Common handler after strategy generation
+  const handleStrategyReceived = async (
+    result: AnalysisResult, 
+    mode: AnalysisMode, 
+    inputDetails: { businessName?: string; businessIdea?: string; industry?: string; fullInputText: string }
+  ) => {
+    setAnalysisResult(result);
+    setAnalysisMode(mode);
 
-    if (!isVerified) {
-      setError('Please verify your email address to generate a strategy.');
-      return;
+    const name = 
+      inputDetails.businessName || 
+      (result as any)?.brandIdentity?.companyNameSuggestions?.[0] ||
+      (result as any)?.branding?.companyNameSuggestions?.[0] ||
+      inputDetails.fullInputText.split('\n')[0].substring(0, 40).trim() ||
+      'New Venture';
+
+    const industry = inputDetails.industry || 'Technology & Services';
+    const score = (result as any)?.businessScore?.overallScore || ((result as any)?.ideaValidation?.score ? Math.round((result as any).ideaValidation.score * 10) : 80);
+
+    const strategyPayload = {
+      businessName: name,
+      industry,
+      mode,
+      score,
+      status: 'validated' as const,
+      result,
+      inputs: {
+        businessName: inputDetails.businessName,
+        businessIdea: inputDetails.businessIdea,
+        industry: inputDetails.industry,
+        userInput: inputDetails.fullInputText,
+      }
+    };
+
+    let newSaved: SavedStrategy;
+    if (user) {
+      try {
+        newSaved = await saveStrategyToFirestore(user.uid, strategyPayload);
+        setSavedStrategies(prev => [newSaved, ...prev.filter(s => s.id !== newSaved.id)]);
+        syncStrategiesWithLocal([newSaved, ...savedStrategies], user.uid);
+      } catch (e) {
+        console.warn('Falling back to local strategy save:', e);
+        newSaved = {
+          ...strategyPayload,
+          id: 'strat_' + Date.now().toString(36),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        setSavedStrategies(prev => [newSaved, ...prev]);
+      }
+    } else {
+      newSaved = {
+        ...strategyPayload,
+        id: 'strat_' + Date.now().toString(36),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      setSavedStrategies(prev => [newSaved, ...prev]);
     }
 
-    if (analysisMode === 'visual' && !hasImageInput) {
-      setError('Please upload an image for Visual Spark analysis.');
-      return;
+    setActiveStrategy(newSaved);
+
+    // Update 3-item quick history
+    const subtitle =
+      (result as any)?.brandIdentity?.sloganSuggestions?.[0] ||
+      (result as any)?.marketAnalysis?.uniqueSellingProposition ||
+      (result as any)?.marketSummary ||
+      inputDetails.fullInputText.substring(0, 80).trim();
+
+    const newHistoryItem: ConceptHistoryItem = {
+      id: newSaved.id,
+      conceptTitle: name,
+      subtitle,
+      timestamp: Date.now(),
+      analysisMode: mode,
+      userInput: inputDetails.fullInputText,
+      analysisResult: result,
+      logoImageUrl: null,
+      score: (result as any)?.ideaValidation?.score,
+    };
+
+    setConceptHistory((prev) => {
+      const updated = [newHistoryItem, ...prev.filter(item => item.id !== newSaved.id)].slice(0, 3);
+      try {
+        localStorage.setItem('stratiq_concept_history', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setActiveConceptId(newSaved.id);
+
+    // Check for logo generation
+    const logoConcept = (result as any)?.brandIdentity?.logoConcept || (result as any)?.branding?.logoConcept;
+    if (logoConcept) {
+      setIsLogoLoading(true);
+      try {
+        const base64Image = await generateLogoImage(logoConcept);
+        const fullLogoUrl = `data:image/jpeg;base64,${base64Image}`;
+        setLogoImageUrl(fullLogoUrl);
+
+        setConceptHistory((prev) => {
+          const updated = prev.map(item => item.id === newSaved.id ? { ...item, logoImageUrl: fullLogoUrl } : item);
+          try {
+            localStorage.setItem('stratiq_concept_history', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      } catch (logoError) {
+        console.error('Logo generation failed:', logoError);
+      } finally {
+        setIsLogoLoading(false);
+      }
     }
-    if (analysisMode !== 'visual' && !hasTextInput) {
-      setError('Please describe your startup or upload a business plan.');
-      return;
-    }
+  };
+
+  // Handler for wizard submission
+  const handleWizardGenerate = async (
+    wizardData: WizardData, 
+    selectedMode: AnalysisMode, 
+    uploadedImage?: { b64: string; mimeType: string; file: File } | null
+  ) => {
+    const composedText = `Startup Name: ${wizardData.businessName || 'Unnamed'}\nIndustry: ${wizardData.industry}\nTarget Customer: ${wizardData.targetCustomer}\nGeographic Market: ${wizardData.location}\nBusiness Model: ${wizardData.businessModel}\nStage: ${wizardData.stage}\nPrimary Goal: ${wizardData.primaryGoal}\nTarget Revenue: ${wizardData.targetRevenue}\nTimeline: ${wizardData.timeline}\nBudget: ${wizardData.budget}\n\nCore Concept:\n${wizardData.businessIdea}`;
 
     setIsLoading(true);
     setError(null);
     setAnalysisResult(null);
     setLogoImageUrl(null);
-    trackEvent('generate_strategy', 'User', analysisMode);
+    trackEvent('wizard_generate_strategy', 'User', selectedMode);
 
     try {
-      const result = await generateStrategy(analysisMode, userInput, image);
-      setAnalysisResult(result);
-      showToast('Strategy generated successfully!', 'success');
-      
-      // Build history item to save the last 3 business concepts
-      const conceptTitle =
-        (result as any)?.brandIdentity?.companyNameSuggestions?.[0] ||
-        (result as any)?.branding?.companyNameSuggestions?.[0] ||
-        userInput.split('\n')[0].substring(0, 45).trim() ||
-        'Business Concept';
-      const subtitle =
-        (result as any)?.brandIdentity?.sloganSuggestions?.[0] ||
-        (result as any)?.marketAnalysis?.uniqueSellingProposition ||
-        (result as any)?.marketSummary ||
-        userInput.substring(0, 90).trim();
-      const score = (result as any)?.ideaValidation?.score;
-      const newId = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-
-      const newItem: ConceptHistoryItem = {
-        id: newId,
-        conceptTitle,
-        subtitle,
-        timestamp: Date.now(),
-        analysisMode,
-        userInput,
-        analysisResult: result,
-        logoImageUrl: null,
-        score,
-      };
-
-      setConceptHistory((prev) => {
-        const updated = [newItem, ...prev.filter(item => item.id !== newId)].slice(0, 3);
-        try {
-          localStorage.setItem('stratiq_concept_history', JSON.stringify(updated));
-        } catch (e) {
-          console.warn('Failed to save concept history to localStorage', e);
-        }
-        return updated;
+      const result = await generateStrategy(selectedMode, composedText, uploadedImage);
+      await handleStrategyReceived(result, selectedMode, {
+        businessName: wizardData.businessName,
+        businessIdea: wizardData.businessIdea,
+        industry: wizardData.industry,
+        fullInputText: composedText,
       });
-      setActiveConceptId(newId);
-
-      const logoConcept = (result as any)?.brandIdentity?.logoConcept || (result as any)?.branding?.logoConcept;
-
-      if (logoConcept) {
-        setIsLogoLoading(true);
-        try {
-          const base64Image = await generateLogoImage(logoConcept);
-          const fullLogoUrl = `data:image/jpeg;base64,${base64Image}`;
-          setLogoImageUrl(fullLogoUrl);
-
-          // Update the saved history item with the generated logo
-          setConceptHistory((prev) => {
-            const updated = prev.map(item => item.id === newId ? { ...item, logoImageUrl: fullLogoUrl } : item);
-            try {
-              localStorage.setItem('stratiq_concept_history', JSON.stringify(updated));
-            } catch {}
-            return updated;
-          });
-        } catch (logoError) {
-          console.error('Logo generation failed:', logoError);
-        } finally {
-          setIsLogoLoading(false);
-        }
-      }
-    } catch (err) {
+      showToast('Comprehensive business blueprint generated and saved to Firestore!', 'success');
+    } catch (err: any) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
       showToast(err instanceof Error ? err.message : 'Strategy generation failed', 'error');
-      trackEvent('generate_error', 'User', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
-  }, [userInput, analysisMode, image, isVerified, showToast]);
+  };
 
   const handleSelectConcept = (item: ConceptHistoryItem) => {
     setActiveConceptId(item.id);
@@ -241,6 +329,7 @@ const AppContent: React.FC = () => {
     setUserInput(item.userInput);
     setLogoImageUrl(item.logoImageUrl);
     setError(null);
+    setCurrentTab('new_analysis');
     showToast(`Loaded "${item.conceptTitle}" from history`, 'info');
   };
 
@@ -253,142 +342,354 @@ const AppContent: React.FC = () => {
     showToast('Concept history cleared', 'info');
   };
 
-  const handleModeChange = (mode: AnalysisMode) => {
-    setAnalysisMode(mode);
-    setAnalysisResult(null);
-    setError(null);
-    trackEvent('change_mode', 'User', mode);
-  }
+  const handleOpenStrategy = (strat: SavedStrategy) => {
+    setActiveStrategy(strat);
+    setAnalysisResult(strat.result);
+    setAnalysisMode(strat.mode || 'deep');
+    setUserInput(strat.inputs?.userInput || strat.inputs?.businessIdea || '');
+    setCurrentTab('new_analysis');
+    showToast(`Loaded "${strat.businessName}" strategy report`, 'info');
+  };
 
-  const handleResendVerification = async () => {
-    if (user?.email) {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: user.email,
-      });
-      if (error) {
-        alert(`Error resending verification: ${error.message}`);
-      } else {
-        alert('Verification email sent! Please check your inbox.');
+  const handleRenameStrategy = async (id: string, newName: string) => {
+    setSavedStrategies(prev => prev.map(s => s.id === id ? { ...s, businessName: newName, updatedAt: Date.now() } : s));
+    if (user) {
+      try {
+        await updateStrategyInFirestore(user.uid, id, { businessName: newName });
+      } catch (e) {
+        console.warn('Failed to rename in Firestore:', e);
       }
+    }
+    showToast('Renamed strategy successfully', 'success');
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: SavedStrategy['status']) => {
+    setSavedStrategies(prev => prev.map(s => s.id === id ? { ...s, status: newStatus, updatedAt: Date.now() } : s));
+    if (user) {
+      try {
+        await updateStrategyInFirestore(user.uid, id, { status: newStatus });
+      } catch (e) {
+        console.warn('Failed to update status in Firestore:', e);
+      }
+    }
+    showToast(`Status updated to ${newStatus}`, 'success');
+  };
+
+  const handleDeleteStrategy = async (id: string) => {
+    if (confirm('Are you sure you want to permanently delete this strategy from your cloud workspace?')) {
+      setSavedStrategies(prev => prev.filter(s => s.id !== id));
+      if (user) {
+        try {
+          await deleteStrategyFromFirestore(user.uid, id);
+        } catch (e) {
+          console.warn('Failed to delete in Firestore:', e);
+        }
+      }
+      showToast('Strategy deleted from Firestore', 'info');
+    }
+  };
+
+  const handleDuplicateStrategy = async (id: string) => {
+    if (!user) return;
+    try {
+      const dup = await duplicateStrategyInFirestore(user.uid, id);
+      setSavedStrategies(prev => [dup, ...prev]);
+      showToast(`Duplicated "${dup.businessName}"`, 'success');
+    } catch (e: any) {
+      showToast('Failed to duplicate strategy: ' + e.message, 'error');
+    }
+  };
+
+  const handleSaveIdea = async (newIdea: BusinessIdeaItem) => {
+    if (user) {
+      try {
+        const saved = await saveIdeaToFirestore(user.uid, newIdea);
+        setSavedIdeas(prev => [saved, ...prev.filter(i => i.id !== saved.id)]);
+      } catch (e) {
+        setSavedIdeas(prev => [newIdea, ...prev]);
+      }
+    } else {
+      setSavedIdeas(prev => [newIdea, ...prev]);
+    }
+    showToast('Saved to Business Idea Vault in Firestore', 'success');
+  };
+
+  const handleDeleteIdea = async (id: string) => {
+    setSavedIdeas(prev => prev.filter(i => i.id !== id));
+    if (user) {
+      try {
+        await deleteIdeaFromFirestore(user.uid, id);
+      } catch (e) {
+        console.warn('Failed to delete idea from Firestore:', e);
+      }
+    }
+    showToast('Idea removed from vault', 'info');
+  };
+
+  const handleAnalyzeIdea = (idea: BusinessIdeaItem) => {
+    setWizardPrefill({
+      businessName: idea.title,
+      businessIdea: idea.description,
+      industry: idea.industry || 'SaaS & Software',
+    });
+    setCurrentTab('new_analysis');
+    showToast(`Pushed "${idea.title}" into Strategy Wizard`, 'info');
+  };
+
+  const handleExportStrategyPdf = async (strat: SavedStrategy) => {
+    try {
+      await exportStrategyToPdf({
+        result: strat.result,
+        mode: strat.mode || 'deep',
+        conceptTitle: strat.businessName,
+      });
+      showToast(`Exported ${strat.businessName} (PDF)`, 'success');
+    } catch (err: any) {
+      showToast('PDF Export failed: ' + err.message, 'error');
     }
   };
 
   const handleInviteMember = (email: string) => {
-      const newMember: TeamMember = {
-          id: Math.random().toString(36).substr(2, 9),
-          email,
-          role: 'viewer',
-          status: 'pending'
-      };
-      setTeamMembers([...teamMembers, newMember]);
-      alert(`Invitation sent to ${email}`);
+    const newMember: TeamMember = {
+      id: Math.random().toString(36).substring(2, 9),
+      email,
+      role: 'viewer',
+      status: 'pending'
+    };
+    setTeamMembers([...teamMembers, newMember]);
+    showToast(`Invitation sent to ${email}`, 'success');
   };
 
   const handleAddComment = (sectionId: string, text: string) => {
-      const newComment: Comment = {
-          id: Math.random().toString(36).substr(2, 9),
-          sectionId,
-          text,
-          author: profile?.full_name || user?.email || 'Anonymous',
-          timestamp: new Date()
-      };
-      setComments([...comments, newComment]);
+    const newComment: Comment = {
+      id: Math.random().toString(36).substring(2, 9),
+      sectionId,
+      text,
+      author: userProfile?.displayName || user?.displayName || user?.email || 'Founder',
+      timestamp: new Date()
+    };
+    setComments([...comments, newComment]);
   };
 
-
-  const showSettings = () => {
-    trackEvent('view_settings', 'User');
-    setView('settings');
-  };
-  const showMain = () => setView('main');
-
-  if (!session || !user) {
+  // If unauthenticated, display the SaaS landing page with signup / login
+  if (!user) {
     return <LandingPage />;
   }
 
-  // --- GATEKEEPING LOGIC ---
-  // If user is logged in but has no subscription tier set, show Pricing Page
-  if (!profile?.subscription_tier) {
-      return <PricingPage onSelectPlan={handleUpdatePlan} />;
-  }
+  const currentPlan = userProfile?.subscriptionPlan || 'free';
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 font-sans">
-      <Header onShowSettings={showSettings} avatarUrl={profile?.avatar_url} />
-      {session && !isVerified && <VerificationBanner onResend={handleResendVerification} />}
-      
-      {/* Collaboration / Team Header Action */}
-      <div className="fixed top-20 right-4 z-40">
-           <button 
-             onClick={() => setShowTeamModal(true)}
-             className="bg-gray-800 p-2 rounded-full shadow-lg border border-gray-700 hover:bg-gray-700 text-indigo-400 transition-colors"
-             title="Manage Team"
-           >
-               <Users size={20} />
-           </button>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between">
+      <div>
+        <Header 
+          currentTab={currentTab}
+          onSelectTab={setCurrentTab}
+          avatarUrl={user.photoURL} 
+          userEmail={user.email}
+          displayName={userProfile?.displayName || user.displayName}
+          isVerified={isEmailVerified}
+        />
 
-      <TeamModal 
-        isOpen={showTeamModal} 
-        onClose={() => setShowTeamModal(false)}
-        members={teamMembers}
-        onInvite={handleInviteMember}
-      />
-
-      <main className="container mx-auto px-4 py-8">
-        {view === 'main' ? (
-          <>
-            <Hero />
-            <div className="bg-gray-800 shadow-2xl rounded-2xl p-6 md:p-10 border border-gray-700">
-              <InputPanel
-                userInput={userInput}
-                setUserInput={setUserInput}
-                onGenerate={handleGenerate}
-                isLoading={isLoading}
-                setError={setError}
-                analysisMode={analysisMode}
-                onModeChange={handleModeChange}
-                image={image?.file}
-                setImage={setImage}
-                isVerified={isVerified}
-              />
-              {error && (
-                <div className="mt-6 bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg" role="alert">
-                  <strong className="font-bold">Error: </strong>
-                  <span className="block sm:inline">{error}</span>
-                </div>
-              )}
-            </div>
-
-            <ConceptHistory 
-              history={conceptHistory}
-              activeId={activeConceptId}
-              onSelectConcept={handleSelectConcept}
-              onClearHistory={handleClearHistory}
-            />
-
-            <ResultsPanel 
-              analysisResult={analysisResult}
-              logoImageUrl={logoImageUrl}
-              isLoading={isLoading}
-              isLogoLoading={isLogoLoading}
-              analysisMode={analysisMode}
-              comments={comments}
-              onAddComment={handleAddComment}
-              isCollaborative={profile.subscription_tier === 'enterprise'}
-            />
-          </>
-        ) : (
-          <ProfileSettings 
-            user={user} 
-            onBack={showMain} 
-            onProfileUpdate={() => fetchProfile(user)}
+        {!isEmailVerified && !isAnonymous && (
+          <VerificationBanner 
+            email={user.email} 
+            onRefresh={refreshVerification}
+            isOnline={isOnline} 
           />
         )}
-      </main>
-      <footer className="text-center py-6 text-gray-500 text-sm">
-        <p>Powered by Gemini API | Plan: <span className="uppercase text-indigo-400">{profile.subscription_tier}</span></p>
+
+        {/* First-time Onboarding Modal */}
+        {showOnboarding && (
+          <OnboardingModal
+            userId={user.uid}
+            onComplete={() => {
+              setShowOnboarding(false);
+              refreshProfile();
+              showToast('Workspace tailored to your venture!', 'success');
+            }}
+            onSkip={() => {
+              setShowOnboarding(false);
+              refreshProfile();
+            }}
+          />
+        )}
+        
+        {/* Collaboration Team Button */}
+        <div className="fixed bottom-6 right-6 z-40">
+          <button 
+            onClick={() => setShowTeamModal(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-indigo-400 p-3.5 rounded-full shadow-2xl border border-slate-700 hover:border-indigo-500 transition-all flex items-center gap-2 group"
+            title="Manage Team & Co-Founders"
+          >
+            <Users size={18} />
+            <span className="text-xs font-bold text-white hidden group-hover:inline pr-1">Team</span>
+          </button>
+        </div>
+
+        <TeamModal 
+          isOpen={showTeamModal} 
+          onClose={() => setShowTeamModal(false)}
+          members={teamMembers}
+          onInvite={handleInviteMember}
+        />
+
+        <main className="container mx-auto px-4 py-8 max-w-7xl">
+          {/* 1. COMMAND CENTER (DASHBOARD) */}
+          {currentTab === 'dashboard' && (
+            <DashboardOverview 
+              stats={overviewStats}
+              recentStrategies={savedStrategies}
+              onStartNewAnalysis={() => setCurrentTab('new_analysis')}
+              onOpenAdvisor={() => setCurrentTab('advisor')}
+              onOpenStrategy={handleOpenStrategy}
+              onViewAllStrategies={() => setCurrentTab('saved_strategies')}
+            />
+          )}
+
+          {/* 2. NEW ANALYSIS (WIZARD & REPORT) */}
+          {currentTab === 'new_analysis' && (
+            <div className="space-y-8 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-indigo-400" />
+                    <span>AI Business Strategy Generator</span>
+                  </h2>
+                  <p className="text-sm text-slate-400 mt-0.5">
+                    Step-by-step venture analysis, market validation, and financial modeling.
+                  </p>
+                </div>
+
+                {analysisResult && (
+                  <button
+                    onClick={() => setAnalysisResult(null)}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Run Another Strategy</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Wizard Form */}
+              {!analysisResult && (
+                <AnalysisWizard 
+                  onGenerate={handleWizardGenerate}
+                  isLoading={isLoading}
+                  isVerified={isEmailVerified || isAnonymous}
+                  initialData={wizardPrefill || undefined}
+                />
+              )}
+
+              {error && (
+                <div className="bg-rose-950/50 border border-rose-700/60 text-rose-300 px-4 py-3 rounded-xl text-sm" role="alert">
+                  <strong className="font-bold">Error: </strong>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* History Bar */}
+              {conceptHistory.length > 0 && !analysisResult && (
+                <ConceptHistory 
+                  history={conceptHistory}
+                  activeId={activeConceptId}
+                  onSelectConcept={handleSelectConcept}
+                  onClearHistory={handleClearHistory}
+                />
+              )}
+
+              {/* Strategic Results Panel */}
+              {analysisResult && (
+                <ResultsPanel 
+                  analysisResult={analysisResult}
+                  logoImageUrl={logoImageUrl}
+                  isLoading={isLoading}
+                  isLogoLoading={isLogoLoading}
+                  analysisMode={analysisMode}
+                  comments={comments}
+                  onAddComment={handleAddComment}
+                  isCollaborative={currentPlan === 'enterprise'}
+                />
+              )}
+            </div>
+          )}
+
+          {/* 3. SAVED STRATEGIES */}
+          {currentTab === 'saved_strategies' && (
+            <SavedStrategiesView 
+              strategies={savedStrategies}
+              onOpenStrategy={handleOpenStrategy}
+              onRenameStrategy={handleRenameStrategy}
+              onUpdateStatus={handleUpdateStatus}
+              onDeleteStrategy={handleDeleteStrategy}
+              onDuplicateStrategy={handleDuplicateStrategy}
+              onCreateNew={() => setCurrentTab('new_analysis')}
+              onExportPdf={handleExportStrategyPdf}
+            />
+          )}
+
+          {/* 4. IDEA VAULT */}
+          {currentTab === 'ideas_vault' && (
+            <BusinessIdeasVault 
+              ideas={savedIdeas}
+              onSaveIdea={handleSaveIdea}
+              onDeleteIdea={handleDeleteIdea}
+              onAnalyzeIdea={handleAnalyzeIdea}
+            />
+          )}
+
+          {/* 5. AI ADVISOR CHAT */}
+          {currentTab === 'advisor' && (
+            <div className="max-w-4xl mx-auto animate-fadeIn">
+              <BusinessAdvisorChat 
+                currentStrategy={activeStrategy || savedStrategies[0] || null}
+                activeAnalysisResult={analysisResult}
+                businessName={activeStrategy?.businessName || 'My Venture'}
+                businessIdea={activeStrategy?.inputs?.businessIdea || activeStrategy?.inputs?.userInput || userInput}
+                industry={activeStrategy?.industry || 'Technology & Services'}
+              />
+            </div>
+          )}
+
+          {/* 6. SUBSCRIPTION PRICING */}
+          {currentTab === 'pricing' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="text-center max-w-2xl mx-auto mb-8">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">Subscription Plans</span>
+                <h2 className="text-3xl font-extrabold text-white mt-1">Upgrade Your Startup Velocity</h2>
+                <p className="text-sm text-slate-400 mt-2">
+                  Current plan: <strong className="text-indigo-400 uppercase">{currentPlan}</strong>
+                </p>
+              </div>
+              <PricingPage onSelectPlan={handleUpdatePlan} />
+            </div>
+          )}
+
+          {/* 7. PROFILE SETTINGS */}
+          {currentTab === 'settings' && (
+            <ProfileSettings 
+              user={user} 
+              profile={userProfile}
+              onBack={() => setCurrentTab('dashboard')} 
+              onProfileUpdate={refreshProfile}
+              onAccountDeleted={() => {
+                setCurrentTab('dashboard');
+                showToast('Account deleted successfully.', 'info');
+              }}
+            />
+          )}
+        </main>
+      </div>
+
+      <footer className="border-t border-slate-800 bg-slate-900/60 py-6 text-center text-xs text-slate-400 mt-12">
+        <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p>© {new Date().getFullYear()} StratIQ — AI Business Co-Founder. Connected to Firebase Firestore.</p>
+          <div className="flex items-center gap-4 text-xs">
+            <span>Powered by Gemini 2.5 Flash</span>
+            <span>•</span>
+            <span>Workspace: <span className="uppercase font-bold text-indigo-400">{currentPlan}</span></span>
+          </div>
+        </div>
       </footer>
     </div>
   );
@@ -397,7 +698,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ToastProvider>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </ToastProvider>
   );
 };

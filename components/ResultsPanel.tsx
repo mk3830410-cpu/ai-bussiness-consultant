@@ -9,6 +9,9 @@ import { CommentSection } from './CollaborationTools';
 import { FinancialCharts } from './FinancialCharts';
 import { useToast } from './Toast';
 import { exportStrategyToPdf } from '../services/pdfExportService';
+import { SWOTQuadrantGrid } from './SWOTQuadrantGrid';
+import { BusinessScoreCard } from './BusinessScoreCard';
+import { ShieldAlert, ListOrdered, Coins, Users2, Printer, Layers, Compass } from 'lucide-react';
 
 // --- PDF Export Modal Component ---
 interface ExportPdfModalProps {
@@ -562,6 +565,30 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
 
     return (
     <div className="space-y-6">
+        {/* Business Opportunity Score Gauge & Dimensional Breakdown */}
+        <div className="mb-6">
+          <BusinessScoreCard 
+            scoreData={strategy.businessScore} 
+            fallbackScore={strategy.ideaValidation?.score}
+            fallbackJustification={strategy.ideaValidation?.justification}
+          />
+        </div>
+
+        {strategy.executiveSummary && (
+          <AccordionSection 
+            sectionId="executiveSummary" 
+            icon={<FileText size={20}/>} 
+            title="Executive Summary & Venture Overview" 
+            defaultOpen={true} 
+            isPrintable={isPrintable} 
+            context={context}
+          >
+            <div className="p-4 bg-gray-900/80 rounded-xl border border-gray-800 text-sm leading-relaxed text-gray-200">
+              {strategy.executiveSummary}
+            </div>
+          </AccordionSection>
+        )}
+
         <AccordionSection 
             sectionId="ideaValidation" 
             icon={<Star size={20}/>} 
@@ -592,29 +619,49 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
             isPrintable={isPrintable} 
             context={context}
             onCopySection={() => {
-                const text = `Target Audience: ${strategy.marketAnalysis.targetAudience}\n\nUnique Selling Proposition: ${strategy.marketAnalysis.uniqueSellingProposition}\n\nCompetitors:\n${strategy.marketAnalysis.competitors.map(c => `• ${c.name}: ${c.analysis}`).join('\n')}`;
+                const swotText = strategy.marketAnalysis.swot ? 
+                    `\n\nSWOT Analysis:\n` +
+                    `Strengths:\n${strategy.marketAnalysis.swot.strengths?.map(s => `• ${s}`).join('\n')}\n` +
+                    `Weaknesses:\n${strategy.marketAnalysis.swot.weaknesses?.map(w => `• ${w}`).join('\n')}\n` +
+                    `Opportunities:\n${strategy.marketAnalysis.swot.opportunities?.map(o => `• ${o}`).join('\n')}\n` +
+                    `Threats:\n${strategy.marketAnalysis.swot.threats?.map(t => `• ${t}`).join('\n')}` : '';
+                const text = `Target Audience: ${strategy.marketAnalysis.targetAudience}\n\nUnique Selling Proposition: ${strategy.marketAnalysis.uniqueSellingProposition}${swotText}\n\nCompetitors:\n${strategy.marketAnalysis.competitors.map(c => `• ${c.name}: ${c.analysis}`).join('\n')}`;
                 navigator.clipboard.writeText(text);
                 showToast('Market analysis copied to clipboard!', 'success', 'copy');
             }}
         >
-            <div className="space-y-4">
-                <div><h4 className="font-bold text-indigo-400">Target Audience:</h4><p>{strategy.marketAnalysis.targetAudience}</p></div>
-                <div><h4 className="font-bold text-indigo-400">Unique Selling Proposition:</h4><p>{strategy.marketAnalysis.uniqueSellingProposition}</p></div>
-                <div>
-                    <h4 className="font-bold text-indigo-400 mb-2">SWOT Analysis:</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                        {Object.entries(strategy.marketAnalysis.swot).map(([key, value]: [string, unknown]) =>(
-                            <div key={key} className="p-3 bg-gray-900/70 rounded-md">
-                                <h5 className="font-semibold capitalize text-white mb-1">{key}</h5>
-                                <ul className="list-disc list-inside space-y-1">{Array.isArray(value) && value.map((item, i)=><li key={i}>{item}</li>)}</ul>
-                            </div>
-                        ))}
+            <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3.5 bg-gray-900/80 rounded-xl border border-gray-800">
+                        <h4 className="font-bold text-indigo-400 mb-1 text-xs uppercase tracking-wider">Target Audience</h4>
+                        <p className="text-gray-200 text-sm leading-relaxed">{strategy.marketAnalysis.targetAudience}</p>
+                    </div>
+                    <div className="p-3.5 bg-gray-900/80 rounded-xl border border-gray-800">
+                        <h4 className="font-bold text-indigo-400 mb-1 text-xs uppercase tracking-wider">Unique Selling Proposition (USP)</h4>
+                        <p className="text-gray-200 text-sm leading-relaxed">{strategy.marketAnalysis.uniqueSellingProposition}</p>
                     </div>
                 </div>
-                 <div>
-                    <h4 className="font-bold text-indigo-400 mb-2">Competitor Landscape:</h4>
-                    <div className="space-y-3">
-                        {strategy.marketAnalysis.competitors.map((c, i) => <div key={i} className="p-3 bg-gray-900/70 rounded-md"><h5 className="font-semibold text-white">{c.name}</h5><p>{c.analysis}</p></div>)}
+
+                <div>
+                    <h4 className="font-bold text-indigo-400 mb-2.5 flex items-center justify-between">
+                        <span>SWOT Analysis (Strategic 2×2 Quadrant)</span>
+                    </h4>
+                    {strategy.marketAnalysis.swot ? (
+                        <SWOTQuadrantGrid swot={strategy.marketAnalysis.swot} isPrintable={isPrintable} />
+                    ) : (
+                        <p className="text-xs text-gray-500 italic">No SWOT analysis data provided.</p>
+                    )}
+                </div>
+
+                <div>
+                    <h4 className="font-bold text-indigo-400 mb-2.5">Competitor Landscape</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {strategy.marketAnalysis.competitors.map((c, i) => (
+                            <div key={i} className="p-3.5 bg-gray-900/80 rounded-xl border border-gray-800 hover:border-gray-700 transition-colors">
+                                <h5 className="font-semibold text-white mb-1">{c.name}</h5>
+                                <p className="text-xs text-gray-300 leading-relaxed">{c.analysis}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -881,6 +928,122 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                 ))}
             </div>
         </AccordionSection>
+
+        {/* 30/60/90 Day Action Plan */}
+        {strategy.actionPlan && (
+          <AccordionSection
+            sectionId="actionPlan"
+            icon={<ListOrdered size={20} />}
+            title="Execution Roadmap & Action Plan (30 / 60 / 90 Days)"
+            defaultOpen={true}
+            isPrintable={isPrintable}
+            context={context}
+          >
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { title: 'Days 1 - 30: Validation & Prototype', tasks: strategy.actionPlan.days30, color: 'border-indigo-500/40 text-indigo-400' },
+                  { title: 'Days 31 - 60: MVP Launch & First Users', tasks: strategy.actionPlan.days60, color: 'border-purple-500/40 text-purple-400' },
+                  { title: 'Days 61 - 90: Monetization & Scale', tasks: strategy.actionPlan.days90, color: 'border-emerald-500/40 text-emerald-400' },
+                ].map((col, idx) => (
+                  <div key={idx} className="p-4 bg-gray-900/70 rounded-xl border border-gray-700/80">
+                    <h5 className={`font-bold text-sm mb-3 border-b border-gray-800 pb-2 ${col.color}`}>
+                      {col.title}
+                    </h5>
+                    <ul className="space-y-2 text-xs text-gray-300">
+                      {col.tasks?.map((t, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-indigo-400 font-bold shrink-0">{i + 1}.</span>
+                          <span className="leading-relaxed">{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              {strategy.actionPlan.keyMilestones && strategy.actionPlan.keyMilestones.length > 0 && (
+                <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-800">
+                  <h5 className="font-bold text-xs uppercase tracking-wider text-gray-400 mb-2">Key Critical Milestones</h5>
+                  <div className="flex flex-wrap gap-2">
+                    {strategy.actionPlan.keyMilestones.map((m, i) => (
+                      <span key={i} className="px-3 py-1 rounded-full bg-indigo-950/60 border border-indigo-700/50 text-indigo-300 text-xs font-semibold">
+                        🎯 {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </AccordionSection>
+        )}
+
+        {/* Risk & Mitigation Matrix */}
+        {strategy.risksAndMitigation && strategy.risksAndMitigation.length > 0 && (
+          <AccordionSection
+            sectionId="risksAndMitigation"
+            icon={<ShieldAlert size={20} />}
+            title="Strategic Risk & Mitigation Matrix"
+            isPrintable={isPrintable}
+            context={context}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {strategy.risksAndMitigation.map((risk, i) => (
+                <div key={i} className="p-4 bg-gray-900/70 rounded-xl border border-gray-700 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-bold text-white text-sm">{risk.risk}</h5>
+                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                      risk.severity === 'high' ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' :
+                      risk.severity === 'medium' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' :
+                      'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    }`}>
+                      {risk.severity || 'medium'} risk
+                    </span>
+                  </div>
+                  <div className="text-xs space-y-1">
+                    <p className="text-gray-400"><strong className="text-gray-300">Likelihood:</strong> {risk.likelihood}</p>
+                    <p className="text-indigo-300"><strong className="text-indigo-400">Mitigation Strategy:</strong> {risk.mitigation}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </AccordionSection>
+        )}
+
+        {/* Funding & Capital Strategy */}
+        {strategy.fundingStrategy && (
+          <AccordionSection
+            sectionId="fundingStrategy"
+            icon={<Coins size={20} />}
+            title="Funding & Capital Strategy"
+            isPrintable={isPrintable}
+            context={context}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-900/70 rounded-xl border border-gray-700">
+                  <span className="text-xs text-gray-400 uppercase font-semibold">Recommended Capital Path</span>
+                  <p className="text-lg font-bold text-emerald-400 mt-1">{strategy.fundingStrategy.recommendedStage}</p>
+                </div>
+                <div className="p-4 bg-gray-900/70 rounded-xl border border-gray-700">
+                  <span className="text-xs text-gray-400 uppercase font-semibold">Estimated Target Raise</span>
+                  <p className="text-lg font-bold text-indigo-400 mt-1">{strategy.fundingStrategy.estimatedRaiseAmount}</p>
+                </div>
+              </div>
+
+              {strategy.fundingStrategy.useOfFunds && (
+                <div className="p-4 bg-gray-900/60 rounded-xl border border-gray-800">
+                  <h5 className="text-xs font-bold text-gray-300 mb-2">Recommended Allocation of Funds:</h5>
+                  <ul className="list-disc list-outside pl-5 space-y-1 text-xs text-gray-300">
+                    {strategy.fundingStrategy.useOfFunds.map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </AccordionSection>
+        )}
     </div>
     );
 };

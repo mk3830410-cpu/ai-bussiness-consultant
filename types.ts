@@ -83,7 +83,54 @@ export interface CustomerJourneyStage {
     strategies: string[];
 }
 
+export interface BusinessScoreBreakdown {
+  overallScore: number;
+  marketPotential: number;
+  competitionScore: number;
+  feasibility: number;
+  revenuePotential: number;
+  growthPotential: number;
+  justification: string;
+}
+
+export interface TargetAudienceDetails {
+  idealCustomer: string;
+  customerPainPoints: string[];
+  customerNeeds: string[];
+  buyingBehavior: string;
+}
+
+export interface RiskChallenge {
+  risk: string;
+  impact: 'Low' | 'Medium' | 'High';
+  mitigation: string;
+}
+
+export interface ActionPlan {
+  day30: string[];
+  day60: string[];
+  day90: string[];
+}
+
 export interface StrategyResponse {
+  // Enhanced Executive & Strategic Fields
+  executiveSummary?: string;
+  businessOpportunityScore?: BusinessScoreBreakdown;
+  targetAudienceDetails?: TargetAudienceDetails;
+  uniqueValueProposition?: string;
+  businessModelOverview?: string;
+  revenueStreamsOverview?: string[];
+  pricingStrategyOverview?: string;
+  goToMarketStrategy?: string;
+  marketingStrategy?: string;
+  customerAcquisitionStrategy?: string;
+  growthStrategy?: string;
+  risksAndChallenges?: RiskChallenge[];
+  actionPlan?: ActionPlan;
+  keyRecommendations?: string[];
+  nextSteps?: string[];
+
+  // Core Structured Fields
   ideaValidation: {
     score: number;
     justification: string;
@@ -92,7 +139,6 @@ export interface StrategyResponse {
   marketAnalysis: {
     targetAudience: string;
     uniqueSellingProposition: string;
-
     swot: SWOT;
     competitors: Competitor[];
   };
@@ -146,4 +192,51 @@ export interface ConceptHistoryItem {
   analysisResult: AnalysisResult;
   logoImageUrl: string | null;
   score?: number;
+}
+
+export interface WizardData {
+  businessName: string;
+  businessIdea: string;
+  industry: string;
+  targetCustomer: string;
+  location: string;
+  businessModel: string;
+  primaryGoal: string;
+  targetRevenue: string;
+  timeline: string;
+  stage: string;
+  budget: string;
+}
+
+export interface SavedStrategy {
+  id: string;
+  userId: string;
+  businessName: string;
+  industry: string;
+  stage: string;
+  targetMarket?: string;
+  createdAt: number;
+  updatedAt: number;
+  score: number;
+  status: 'draft' | 'validated' | 'in_review' | 'launched';
+  analysisMode: AnalysisMode;
+  inputs: Partial<WizardData> & { userInput?: string };
+  result: AnalysisResult;
+  logoUrl?: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+export interface BusinessIdeaItem {
+  id: string;
+  title: string;
+  description: string;
+  industry: string;
+  tags: string[];
+  createdAt: number;
 }
