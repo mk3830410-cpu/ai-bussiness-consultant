@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, testConnection } from '../lib/firebase';
 import { 
+  onAuthStateChanged, 
+  AuthUser as FirebaseUser,
+  auth, 
+  testConnection,
   fetchUserProfile, 
   syncUserProfile, 
   UserProfileData, 

@@ -319,7 +319,7 @@ const LandingPage: React.FC<LandingPageProps> = () => {
 
       <footer className="text-center py-8 text-gray-500 text-sm border-t border-gray-800/50 relative z-10">
         <div className="container mx-auto px-4">
-          <p>Powered by the Gemini API • Built with ❤️ for entrepreneurs</p>
+          <p>Powered by StratIQ Intelligence Engine • Built with ❤️ for entrepreneurs</p>
         </div>
       </footer>
 

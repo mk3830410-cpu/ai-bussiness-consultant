@@ -1,118 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Default-deny catch-all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Helper functions
-    function isSignedIn() {
+    function isAuthenticated() {
       return request.auth != null;
     }
-
+    
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    // User Profile Document
+    // User profile document
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false; // Blanket listing of user profiles is strictly forbidden
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
 
-      allow create: if isOwner(userId) &&
-        isValidId(userId) &&
-        incoming().uid == userId &&
-        incoming().email is string && incoming().email.size() <= 256;
-
-      allow update: if isOwner(userId) &&
-        incoming().uid == existing().uid;
-
-      allow delete: if isOwner(userId);
-
-      // User Strategies Subcollection
+      // User strategies subcollection
       match /strategies/{strategyId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-
-        allow create: if isOwner(userId) &&
-          isValidId(strategyId) &&
-          incoming().userId == userId &&
-          incoming().businessName is string && incoming().businessName.size() <= 200;
-
-        allow update: if isOwner(userId) &&
-          incoming().userId == userId;
-
-        allow delete: if isOwner(userId);
+        allow read, write: if isOwner(userId);
       }
 
-      // User Analyses Subcollection
-      match /analyses/{analysisId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-
-        allow create: if isOwner(userId) &&
-          isValidId(analysisId) &&
-          incoming().userId == userId &&
-          incoming().businessName is string && incoming().businessName.size() <= 200;
-
-        allow update: if isOwner(userId) &&
-          incoming().userId == userId;
-
-        allow delete: if isOwner(userId);
-      }
-
-      // User Business Ideas Subcollection
+      // User ideas subcollection
       match /ideas/{ideaId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-
-        allow create: if isOwner(userId) &&
-          isValidId(ideaId) &&
-          incoming().userId == userId &&
-          incoming().title is string && incoming().title.size() <= 200;
-
-        allow update: if isOwner(userId) &&
-          incoming().userId == userId;
-
-        allow delete: if isOwner(userId);
+        allow read, write: if isOwner(userId);
       }
 
-      // User AI Advisor Chat Messages Subcollection
-      match /chats/{chatId}/messages/{messageId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-
-        allow create: if isOwner(userId) &&
-          isValidId(messageId) &&
-          incoming().role is string &&
-          incoming().content is string && incoming().content.size() <= 30000;
-
-        allow update: if isOwner(userId);
-        allow delete: if isOwner(userId);
-      }
-
-      // User Settings Subcollection
+      // User settings subcollection
       match /settings/{settingId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
-        allow delete: if isOwner(userId);
+        allow read, write: if isOwner(userId);
       }
+
+      // User chats subcollection
+      match /chats/{chatId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Shared strategies
+    match /shared_strategies/{strategyId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
     }
   }
 }

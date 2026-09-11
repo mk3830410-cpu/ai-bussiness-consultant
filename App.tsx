@@ -55,7 +55,7 @@ import { validateEnvironment } from './services/envValidation';
 const AppContent: React.FC = () => {
   const { showToast } = useToast();
 
-  // Validate Firebase & Analytics configuration upon app load
+  // Validate client environment upon app load
   useEffect(() => {
     validateEnvironment();
   }, []);

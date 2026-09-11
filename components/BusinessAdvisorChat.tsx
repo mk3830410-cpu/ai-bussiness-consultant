@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ChatMessage, SavedStrategy, AnalysisResult } from '../types';
 import { askBusinessAdvisor } from '../services/geminiService';
-import { auth } from '../lib/firebase';
+import { auth } from '../services/authService';
 import { 
   fetchChatHistory, 
   saveChatMessage, 

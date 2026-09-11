@@ -1,6 +1,15 @@
 
 export type AnalysisMode = 'deep' | 'market' | 'quick' | 'visual';
 
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  emailVerified: boolean;
+  isAnonymous: boolean;
+}
+
 export type SubscriptionTier = 'free' | 'pro' | 'enterprise' | null;
 
 export interface TeamMember {

@@ -197,7 +197,7 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
             />
           </div>
           <p className="text-xs text-gray-500 mt-4">
-            Evaluating with Gemini 3.8 Flash • Generates comprehensive 18-section strategy
+            StratIQ Strategy Synthesis Engine • Generates comprehensive 18-section investor-grade strategy
           </p>
         </div>
       )}

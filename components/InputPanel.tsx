@@ -17,10 +17,10 @@ interface InputPanelProps {
 }
 
 const analysisModes = [
-  { id: 'deep', name: 'Deep Dive', icon: BrainCircuit, description: 'Comprehensive strategy with financials, branding & more. (gemini-2.5-pro)' },
-  { id: 'market', name: 'Market Pulse', icon: Search, description: 'Up-to-date competitor & market analysis. (gemini-2.5-flash + Search)' },
-  { id: 'quick', name: 'Quick Brainstorm', icon: Zap, description: 'Fast, high-level ideas and validation. (gemini-2.5-flash-lite)' },
-  { id: 'visual', name: 'Visual Spark', icon: Eye, description: 'Analyze an image (logo, UI, product). (gemini-2.5-flash)' },
+  { id: 'deep', name: 'Deep Dive', icon: BrainCircuit, description: 'Comprehensive strategy with financials, branding, SWOT & roadmap.' },
+  { id: 'market', name: 'Market Pulse', icon: Search, description: 'Up-to-date industry trends, positioning & competitor breakdown.' },
+  { id: 'quick', name: 'Quick Brainstorm', icon: Zap, description: 'Fast, high-level opportunity score & instant validation.' },
+  { id: 'visual', name: 'Visual Spark', icon: Eye, description: 'Analyze branding assets, logo, UI, or product screenshots.' },
 ];
 
 const InputPanel: React.FC<InputPanelProps> = ({ userInput, setUserInput, onGenerate, isLoading, setError, analysisMode, onModeChange, image, setImage, isVerified }) => {

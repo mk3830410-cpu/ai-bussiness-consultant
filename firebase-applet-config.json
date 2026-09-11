@@ -1,12 +1,10 @@
 {
-  "projectId": "lottery-management-application",
-  "appId": "1:808836467865:web:a8b0dc24ff43fd2deb7c08",
-  "apiKey": "AIzaSyBC1thTlpAwMtyXKTtOKknUyjDU6yM3sus",
-  "authDomain": "lottery-management-application.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-stratiqtheaibusi-c4eb022b-e8db-4b3c-8ff4-c1942c2c18dd",
-  "storageBucket": "lottery-management-application.firebasestorage.app",
-  "messagingSenderId": "808836467865",
-  "measurementId": "G-W8MDCR2JQY",
-  "oAuthClientId": "808836467865-78keqb92q3sbh1qmjj7eviej1smvv2il.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "apiKey": "AIzaSyAIO8ExXvc3qqL4I-_ZeHRiXUA28XrLtMg",
+  "authDomain": "ai-bussiness-consultant-9e923.firebaseapp.com",
+  "projectId": "ai-bussiness-consultant-9e923",
+  "storageBucket": "ai-bussiness-consultant-9e923.firebasestorage.app",
+  "messagingSenderId": "284254553752",
+  "appId": "1:284254553752:web:2a48dbd5e58919c5e3f2ed",
+  "measurementId": "G-SN22Q315DX",
+  "firestoreDatabaseId": "(default)"
 }

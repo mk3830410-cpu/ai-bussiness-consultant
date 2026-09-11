@@ -18,14 +18,14 @@ import {
   ShieldAlert,
   Save
 } from 'lucide-react';
-import { User as FirebaseUser } from 'firebase/auth';
 import { 
+  UserProfileData, 
+  FirebaseUser,
   updateProfileDetails, 
   updateUserPassword, 
   deleteUserAccount,
   sendVerificationEmail,
-  reloadUserVerification,
-  UserProfileData 
+  reloadUserVerification 
 } from '../services/authService';
 import { 
   fetchUserSettings, 

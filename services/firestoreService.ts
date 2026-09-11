@@ -1,19 +1,17 @@
 import { 
   collection, 
   doc, 
-  getDocs, 
   getDoc, 
+  getDocs, 
   setDoc, 
   updateDoc, 
   deleteDoc, 
   query, 
-  orderBy, 
-  limit,
-  where,
-  Timestamp 
+  orderBy,
+  serverTimestamp 
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { SavedStrategy, BusinessIdeaItem, AnalysisResult, AnalysisMode } from '../types';
+import { db } from '../lib/firebase';
+import { SavedStrategy, BusinessIdeaItem } from '../types';
 
 export interface FirestoreStrategyRecord extends SavedStrategy {
   userId: string;
@@ -45,266 +43,6 @@ export interface PersistedChatMessage {
   createdAt: string;
 }
 
-// ==========================================
-// 1. STRATEGIES SUBCOLLECTION (users/{uid}/strategies)
-// ==========================================
-
-export async function fetchUserStrategies(uid: string): Promise<SavedStrategy[]> {
-  const path = `users/${uid}/strategies`;
-  try {
-    const colRef = collection(db, 'users', uid, 'strategies');
-    const q = query(colRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map(docSnap => {
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        businessName: data.businessName || 'Unnamed Venture',
-        industry: data.industry || 'Technology & Services',
-        createdAt: data.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
-        updatedAt: data.updatedAt ? new Date(data.updatedAt).getTime() : Date.now(),
-        score: typeof data.score === 'number' ? data.score : 80,
-        status: data.status || 'draft',
-        mode: data.mode || 'deep',
-        result: data.result,
-        inputs: data.inputs || {},
-      } as SavedStrategy;
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-  }
-}
-
-export async function saveStrategyToFirestore(uid: string, strategy: Omit<SavedStrategy, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<SavedStrategy> {
-  const id = strategy.id || 'strat_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
-  const path = `users/${uid}/strategies/${id}`;
-  const nowIso = new Date().toISOString();
-
-  const record = {
-    id,
-    userId: uid,
-    businessName: strategy.businessName || 'Venture Strategy',
-    industry: strategy.industry || 'Technology',
-    score: typeof strategy.score === 'number' ? strategy.score : 80,
-    status: strategy.status || 'validated',
-    mode: strategy.mode || 'deep',
-    result: strategy.result || {},
-    inputs: strategy.inputs || {},
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-
-  try {
-    await setDoc(doc(db, 'users', uid, 'strategies', id), record);
-    return {
-      ...strategy,
-      id,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    } as SavedStrategy;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-export async function updateStrategyInFirestore(uid: string, strategyId: string, updates: Partial<SavedStrategy>): Promise<void> {
-  const path = `users/${uid}/strategies/${strategyId}`;
-  try {
-    const docRef = doc(db, 'users', uid, 'strategies', strategyId);
-    const updateData: Record<string, any> = {
-      updatedAt: new Date().toISOString(),
-    };
-    if (updates.businessName !== undefined) updateData.businessName = updates.businessName;
-    if (updates.industry !== undefined) updateData.industry = updates.industry;
-    if (updates.status !== undefined) updateData.status = updates.status;
-    if (updates.score !== undefined) updateData.score = updates.score;
-    if (updates.result !== undefined) updateData.result = updates.result;
-    if (updates.inputs !== undefined) updateData.inputs = updates.inputs;
-
-    await updateDoc(docRef, updateData);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-  }
-}
-
-export async function deleteStrategyFromFirestore(uid: string, strategyId: string): Promise<void> {
-  const path = `users/${uid}/strategies/${strategyId}`;
-  try {
-    await deleteDoc(doc(db, 'users', uid, 'strategies', strategyId));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-  }
-}
-
-export async function duplicateStrategyInFirestore(uid: string, strategyId: string): Promise<SavedStrategy> {
-  const path = `users/${uid}/strategies/${strategyId}`;
-  try {
-    const snap = await getDoc(doc(db, 'users', uid, 'strategies', strategyId));
-    if (!snap.exists()) {
-      throw new Error('Strategy to duplicate not found.');
-    }
-    const data = snap.data();
-    const duplicatedName = `${data.businessName} (Copy)`;
-    return await saveStrategyToFirestore(uid, {
-      businessName: duplicatedName,
-      industry: data.industry,
-      score: data.score,
-      status: 'draft',
-      mode: data.mode,
-      result: data.result,
-      inputs: data.inputs,
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-  }
-}
-
-// ==========================================
-// 2. BUSINESS IDEAS VAULT (users/{uid}/ideas)
-// ==========================================
-
-export async function fetchUserIdeas(uid: string): Promise<BusinessIdeaItem[]> {
-  const path = `users/${uid}/ideas`;
-  try {
-    const colRef = collection(db, 'users', uid, 'ideas');
-    const q = query(colRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map(docSnap => {
-      const d = docSnap.data();
-      return {
-        id: docSnap.id,
-        title: d.title || 'Untitled Idea',
-        description: d.description || '',
-        industry: d.industry || 'Technology',
-        status: d.status || 'raw',
-        tags: Array.isArray(d.tags) ? d.tags : [],
-        notes: d.notes || '',
-        createdAt: d.createdAt ? new Date(d.createdAt).getTime() : Date.now(),
-        updatedAt: d.updatedAt ? new Date(d.updatedAt).getTime() : Date.now(),
-      } as BusinessIdeaItem;
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-  }
-}
-
-export async function saveIdeaToFirestore(uid: string, idea: Omit<BusinessIdeaItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<BusinessIdeaItem> {
-  const id = idea.id || 'idea_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
-  const path = `users/${uid}/ideas/${id}`;
-  const nowIso = new Date().toISOString();
-
-  const record = {
-    id,
-    userId: uid,
-    title: idea.title || 'New Business Spark',
-    description: idea.description || '',
-    industry: idea.industry || 'Technology',
-    status: idea.status || 'raw',
-    tags: Array.isArray(idea.tags) ? idea.tags : [],
-    notes: idea.notes || '',
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-
-  try {
-    await setDoc(doc(db, 'users', uid, 'ideas', id), record);
-    return {
-      ...idea,
-      id,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    } as BusinessIdeaItem;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-export async function updateIdeaInFirestore(uid: string, ideaId: string, updates: Partial<BusinessIdeaItem>): Promise<void> {
-  const path = `users/${uid}/ideas/${ideaId}`;
-  try {
-    const docRef = doc(db, 'users', uid, 'ideas', ideaId);
-    const updateData: Record<string, any> = {
-      updatedAt: new Date().toISOString(),
-    };
-    if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.industry !== undefined) updateData.industry = updates.industry;
-    if (updates.status !== undefined) updateData.status = updates.status;
-    if (updates.tags !== undefined) updateData.tags = updates.tags;
-    if (updates.notes !== undefined) updateData.notes = updates.notes;
-
-    await updateDoc(docRef, updateData);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-  }
-}
-
-export async function deleteIdeaFromFirestore(uid: string, ideaId: string): Promise<void> {
-  const path = `users/${uid}/ideas/${ideaId}`;
-  try {
-    await deleteDoc(doc(db, 'users', uid, 'ideas', ideaId));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-  }
-}
-
-// ==========================================
-// 3. AI ADVISOR CHAT PERSISTENCE (users/{uid}/chats/main/messages)
-// ==========================================
-
-export async function fetchChatHistory(uid: string, chatId: string = 'main'): Promise<PersistedChatMessage[]> {
-  const path = `users/${uid}/chats/${chatId}/messages`;
-  try {
-    const colRef = collection(db, 'users', uid, 'chats', chatId, 'messages');
-    const q = query(colRef, orderBy('timestamp', 'asc'), limit(50));
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map(docSnap => docSnap.data() as PersistedChatMessage);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-  }
-}
-
-export async function saveChatMessage(uid: string, chatId: string = 'main', role: 'user' | 'assistant' | 'system', content: string): Promise<PersistedChatMessage> {
-  const messageId = 'msg_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
-  const path = `users/${uid}/chats/${chatId}/messages/${messageId}`;
-  const now = Date.now();
-
-  const record: PersistedChatMessage = {
-    id: messageId,
-    userId: uid,
-    role,
-    content,
-    timestamp: now,
-    createdAt: new Date(now).toISOString(),
-  };
-
-  try {
-    await setDoc(doc(db, 'users', uid, 'chats', chatId, 'messages', messageId), record);
-    return record;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-export async function clearChatHistory(uid: string, chatId: string = 'main'): Promise<void> {
-  const path = `users/${uid}/chats/${chatId}/messages`;
-  try {
-    const colRef = collection(db, 'users', uid, 'chats', chatId, 'messages');
-    const snapshot = await getDocs(colRef);
-    const deleteOps = snapshot.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(deleteOps);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-  }
-}
-
-// ==========================================
-// 4. USER SETTINGS & PREFERENCES (users/{uid}/settings/preferences)
-// ==========================================
-
 export const DEFAULT_PREFERENCES: UserPreferences = {
   theme: 'dark',
   notifications: true,
@@ -314,103 +52,461 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   language: 'en',
 };
 
-export async function fetchUserSettings(uid: string): Promise<UserPreferences> {
-  const path = `users/${uid}/settings/preferences`;
+// Local storage backup keys helper
+const getStrategyKey = (uid: string) => `stratiq_strategies_${uid}`;
+const getIdeaKey = (uid: string) => `stratiq_ideas_${uid}`;
+const getSettingsKey = (uid: string) => `stratiq_settings_${uid}`;
+const getChatKey = (strategyId: string) => `stratiq_chat_${strategyId}`;
+
+// ==========================================
+// 1. STRATEGIES SUBCOLLECTION
+// ==========================================
+
+export async function fetchUserStrategies(uid: string): Promise<SavedStrategy[]> {
+  if (!uid) return [];
+
   try {
-    const snap = await getDoc(doc(db, 'users', uid, 'settings', 'preferences'));
-    if (snap.exists()) {
-      return { ...DEFAULT_PREFERENCES, ...snap.data() } as UserPreferences;
+    const strategiesRef = collection(db, 'users', uid, 'strategies');
+    const q = query(strategiesRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    const remoteList: SavedStrategy[] = snapshot.docs.map(docSnap => ({
+      ...(docSnap.data() as SavedStrategy),
+      id: docSnap.id,
+    }));
+
+    if (remoteList.length > 0) {
+      localStorage.setItem(getStrategyKey(uid), JSON.stringify(remoteList));
+      return remoteList;
+    }
+  } catch (error) {
+    console.warn('Firestore fetchUserStrategies failed, using local cache:', error);
+  }
+
+  // Fallback to local cache
+  try {
+    const raw = localStorage.getItem(getStrategyKey(uid));
+    if (!raw) return [];
+    const list: SavedStrategy[] = JSON.parse(raw);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  } catch {
+    return [];
+  }
+}
+
+export async function saveStrategyToFirestore(
+  strategy: Omit<SavedStrategy, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+): Promise<string> {
+  const uid = strategy.userId;
+  const now = Date.now();
+  const id = strategy.id || `strat_${Math.random().toString(36).substring(2, 9)}_${now}`;
+
+  const completeStrategy: SavedStrategy = {
+    ...strategy,
+    id,
+    createdAt: now,
+    updatedAt: now,
+  } as SavedStrategy;
+
+  // 1. Update local storage for immediate UI responsiveness
+  try {
+    const localList = await fetchUserStrategies(uid);
+    const existingIndex = localList.findIndex(s => s.id === id);
+    if (existingIndex >= 0) {
+      localList[existingIndex] = completeStrategy;
+    } else {
+      localList.unshift(completeStrategy);
+    }
+    localStorage.setItem(getStrategyKey(uid), JSON.stringify(localList));
+  } catch (e) {
+    console.error('Failed to update local strategy list:', e);
+  }
+
+  // 2. Persist to Firestore
+  try {
+    const stratDocRef = doc(db, 'users', uid, 'strategies', id);
+    await setDoc(stratDocRef, {
+      ...completeStrategy,
+      updatedAt: serverTimestamp(),
+      createdAt: completeStrategy.createdAt || now,
+    }, { merge: true });
+  } catch (error) {
+    console.warn('Firestore saveStrategy failed, strategy preserved locally:', error);
+  }
+
+  return id;
+}
+
+export async function updateStrategyInFirestore(
+  strategyId: string,
+  updates: Partial<SavedStrategy>
+): Promise<void> {
+  const now = Date.now();
+
+  // 1. Local update
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('stratiq_strategies_')) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const list: SavedStrategy[] = JSON.parse(raw);
+        const index = list.findIndex(item => item.id === strategyId);
+        if (index >= 0) {
+          list[index] = { ...list[index], ...updates, updatedAt: now };
+          localStorage.setItem(key, JSON.stringify(list));
+          
+          // 2. Remote update if userId found
+          const uid = list[index].userId;
+          if (uid) {
+            try {
+              const stratDocRef = doc(db, 'users', uid, 'strategies', strategyId);
+              await updateDoc(stratDocRef, {
+                ...updates,
+                updatedAt: serverTimestamp(),
+              });
+            } catch (err) {
+              console.warn('Firestore updateDoc failed, updated locally:', err);
+            }
+          }
+          return;
+        }
+      } catch (e) {
+        console.error('Error updating strategy:', e);
+      }
+    }
+  }
+}
+
+export async function deleteStrategyFromFirestore(strategyId: string): Promise<void> {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('stratiq_strategies_')) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const list: SavedStrategy[] = JSON.parse(raw);
+        const target = list.find(s => s.id === strategyId);
+        if (target) {
+          const filtered = list.filter(item => item.id !== strategyId);
+          localStorage.setItem(key, JSON.stringify(filtered));
+
+          const uid = target.userId;
+          if (uid) {
+            try {
+              const stratDocRef = doc(db, 'users', uid, 'strategies', strategyId);
+              await deleteDoc(stratDocRef);
+            } catch (err) {
+              console.warn('Firestore deleteDoc failed:', err);
+            }
+          }
+          return;
+        }
+      } catch (e) {
+        console.error('Error deleting strategy:', e);
+      }
+    }
+  }
+}
+
+export async function duplicateStrategyInFirestore(
+  strategyId: string,
+  uid: string
+): Promise<SavedStrategy | null> {
+  const list = await fetchUserStrategies(uid);
+  const target = list.find(s => s.id === strategyId);
+  if (!target) return null;
+
+  const duplicated: SavedStrategy = {
+    ...target,
+    id: `strat_copy_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`,
+    title: `${target.title} (Copy)`,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  await saveStrategyToFirestore(duplicated);
+  return duplicated;
+}
+
+// ==========================================
+// 2. IDEAS SUBCOLLECTION
+// ==========================================
+
+export async function fetchUserIdeas(uid: string): Promise<BusinessIdeaItem[]> {
+  if (!uid) return [];
+
+  try {
+    const ideasRef = collection(db, 'users', uid, 'ideas');
+    const q = query(ideasRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    const remoteList: BusinessIdeaItem[] = snapshot.docs.map(docSnap => ({
+      ...(docSnap.data() as BusinessIdeaItem),
+      id: docSnap.id,
+    }));
+
+    if (remoteList.length > 0) {
+      localStorage.setItem(getIdeaKey(uid), JSON.stringify(remoteList));
+      return remoteList;
+    }
+  } catch (error) {
+    console.warn('Firestore fetchUserIdeas failed, using local cache:', error);
+  }
+
+  try {
+    const raw = localStorage.getItem(getIdeaKey(uid));
+    if (!raw) return [];
+    const list: BusinessIdeaItem[] = JSON.parse(raw);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  } catch {
+    return [];
+  }
+}
+
+export async function saveIdeaToFirestore(
+  idea: Omit<BusinessIdeaItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+): Promise<string> {
+  const uid = idea.userId;
+  const now = Date.now();
+  const id = idea.id || `idea_${Math.random().toString(36).substring(2, 9)}_${now}`;
+
+  const completeIdea: BusinessIdeaItem = {
+    ...idea,
+    id,
+    createdAt: now,
+    updatedAt: now,
+  } as BusinessIdeaItem;
+
+  // Local storage
+  try {
+    const localList = await fetchUserIdeas(uid);
+    const existingIndex = localList.findIndex(i => i.id === id);
+    if (existingIndex >= 0) {
+      localList[existingIndex] = completeIdea;
+    } else {
+      localList.unshift(completeIdea);
+    }
+    localStorage.setItem(getIdeaKey(uid), JSON.stringify(localList));
+  } catch (e) {
+    console.error('Failed to update local idea cache:', e);
+  }
+
+  // Remote Firestore
+  try {
+    const ideaDocRef = doc(db, 'users', uid, 'ideas', id);
+    await setDoc(ideaDocRef, {
+      ...completeIdea,
+      updatedAt: serverTimestamp(),
+      createdAt: completeIdea.createdAt || now,
+    }, { merge: true });
+  } catch (error) {
+    console.warn('Firestore saveIdea failed, preserved locally:', error);
+  }
+
+  return id;
+}
+
+export async function updateIdeaInFirestore(
+  ideaId: string,
+  updates: Partial<BusinessIdeaItem>
+): Promise<void> {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('stratiq_ideas_')) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const list: BusinessIdeaItem[] = JSON.parse(raw);
+        const index = list.findIndex(item => item.id === ideaId);
+        if (index >= 0) {
+          list[index] = { ...list[index], ...updates };
+          localStorage.setItem(key, JSON.stringify(list));
+
+          const uid = list[index].userId;
+          if (uid) {
+            try {
+              const ideaDocRef = doc(db, 'users', uid, 'ideas', ideaId);
+              await updateDoc(ideaDocRef, updates);
+            } catch (err) {
+              console.warn('Firestore updateIdea failed:', err);
+            }
+          }
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to update idea:', e);
+      }
+    }
+  }
+}
+
+export async function deleteIdeaFromFirestore(ideaId: string): Promise<void> {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('stratiq_ideas_')) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const list: BusinessIdeaItem[] = JSON.parse(raw);
+        const target = list.find(item => item.id === ideaId);
+        if (target) {
+          const filtered = list.filter(item => item.id !== ideaId);
+          localStorage.setItem(key, JSON.stringify(filtered));
+
+          const uid = target.userId;
+          if (uid) {
+            try {
+              const ideaDocRef = doc(db, 'users', uid, 'ideas', ideaId);
+              await deleteDoc(ideaDocRef);
+            } catch (err) {
+              console.warn('Firestore deleteIdea failed:', err);
+            }
+          }
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to delete idea:', e);
+      }
+    }
+  }
+}
+
+// ==========================================
+// 3. USER SETTINGS & PREFERENCES
+// ==========================================
+
+export async function fetchUserSettings(uid: string): Promise<UserPreferences> {
+  if (!uid) return DEFAULT_PREFERENCES;
+
+  try {
+    const settingsDoc = await getDoc(doc(db, 'users', uid, 'settings', 'preferences'));
+    if (settingsDoc.exists()) {
+      const data = settingsDoc.data() as UserPreferences;
+      localStorage.setItem(getSettingsKey(uid), JSON.stringify(data));
+      return { ...DEFAULT_PREFERENCES, ...data };
+    }
+  } catch (err) {
+    console.warn('Firestore fetchUserSettings fallback to local:', err);
+  }
+
+  try {
+    const raw = localStorage.getItem(getSettingsKey(uid));
+    if (raw) {
+      return { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) };
     }
     return DEFAULT_PREFERENCES;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
+  } catch {
+    return DEFAULT_PREFERENCES;
   }
 }
 
-export async function saveUserSettings(uid: string, prefs: Partial<UserPreferences>): Promise<UserPreferences> {
-  const path = `users/${uid}/settings/preferences`;
+export async function saveUserSettings(
+  uid: string,
+  prefs: Partial<UserPreferences>
+): Promise<UserPreferences> {
+  const current = await fetchUserSettings(uid);
+  const merged: UserPreferences = {
+    ...current,
+    ...prefs,
+    updatedAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(getSettingsKey(uid), JSON.stringify(merged));
+
   try {
-    const docRef = doc(db, 'users', uid, 'settings', 'preferences');
-    const merged = {
-      ...DEFAULT_PREFERENCES,
-      ...prefs,
-      updatedAt: new Date().toISOString(),
-    };
-    await setDoc(docRef, merged, { merge: true });
-    return merged;
+    await setDoc(doc(db, 'users', uid, 'settings', 'preferences'), merged, { merge: true });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.warn('Firestore saveUserSettings failed:', error);
   }
-}
 
-// ==========================================
-// 5. USER ONBOARDING & PROFILE
-// ==========================================
+  return merged;
+}
 
 export async function updateUserProfile(uid: string, data: Record<string, any>): Promise<void> {
-  const path = `users/${uid}`;
   try {
-    const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
-      ...data,
-      updatedAt: new Date().toISOString(),
-    });
+    const raw = localStorage.getItem(`stratiq_profile_${uid}`);
+    const existing = raw ? JSON.parse(raw) : {};
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    localStorage.setItem(`stratiq_profile_${uid}`, JSON.stringify(updated));
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    console.error('Failed to update profile data locally:', error);
+  }
+
+  try {
+    await setDoc(doc(db, 'users', uid), {
+      ...data,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Firestore updateUserProfile failed:', err);
   }
 }
 
 export async function saveUserOnboardingData(uid: string, data: UserOnboardingData): Promise<void> {
-  const path = `users/${uid}`;
   try {
-    const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
-      onboardingCompleted: true,
-      onboardingData: data,
-      updatedAt: new Date().toISOString(),
-    });
+    const raw = localStorage.getItem(`stratiq_onboarding_${uid}`);
+    const existing = raw ? JSON.parse(raw) : {};
+    const updated = { ...existing, ...data, updatedAt: new Date().toISOString() };
+    localStorage.setItem(`stratiq_onboarding_${uid}`, JSON.stringify(updated));
+    await updateUserProfile(uid, { onboardingCompleted: true, ...data });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    console.error('Failed to save onboarding data:', error);
   }
 }
 
 // ==========================================
-// 6. REAL DASHBOARD STATS (Driven directly by Firestore)
+// 4. CHAT HISTORY
 // ==========================================
 
-export async function fetchUserDashboardStats(uid: string) {
+export async function fetchChatHistory(strategyId: string): Promise<any[]> {
   try {
-    const [strategies, ideas] = await Promise.all([
-      fetchUserStrategies(uid),
-      fetchUserIdeas(uid),
-    ]);
+    const raw = localStorage.getItem(getChatKey(strategyId));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
-    const totalAnalyses = strategies.length;
-    const validatedStrategies = strategies.filter(s => s.status === 'validated' || s.status === 'launched').length;
-    const totalIdeas = ideas.length;
-
-    const scores = strategies.map(s => s.score || 0).filter(s => s > 0);
-    const avgScore = scores.length > 0 
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) 
-      : 84;
-
-    return {
-      totalAnalyses,
-      validatedStrategies,
-      totalIdeas,
-      avgScore,
-      strategies,
-      ideas,
-    };
+export async function saveChatMessage(strategyId: string, message: any): Promise<void> {
+  try {
+    const list = await fetchChatHistory(strategyId);
+    list.push(message);
+    localStorage.setItem(getChatKey(strategyId), JSON.stringify(list));
   } catch (error) {
-    console.error('Error calculating dashboard stats from Firestore:', error);
-    return {
-      totalAnalyses: 0,
-      validatedStrategies: 0,
-      totalIdeas: 0,
-      avgScore: 84,
-      strategies: [],
-      ideas: [],
-    };
+    console.error('Failed to save chat message:', error);
+  }
+}
+
+export async function clearChatHistory(strategyId: string): Promise<void> {
+  try {
+    localStorage.removeItem(getChatKey(strategyId));
+  } catch (error) {
+    console.error('Failed to clear chat history:', error);
+  }
+}
+
+export async function fetchSharedStrategy(strategyId: string): Promise<SavedStrategy | null> {
+  try {
+    const sharedDoc = await getDoc(doc(db, 'shared_strategies', strategyId));
+    if (sharedDoc.exists()) {
+      return sharedDoc.data() as SavedStrategy;
+    }
+  } catch {}
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('stratiq_strategies_')) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const list: SavedStrategy[] = JSON.parse(raw);
+        const match = list.find(s => s.id === strategyId);
+        if (match) return match;
+      }
+    }
+    return null;
+  } catch {
+    return null;
   }
 }

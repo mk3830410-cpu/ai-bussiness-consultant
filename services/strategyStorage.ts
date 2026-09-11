@@ -1,5 +1,5 @@
 import { SavedStrategy, BusinessIdeaItem, AnalysisResult } from '../types';
-import { auth } from '../lib/firebase';
+import { auth } from './authService';
 import { 
   fetchUserStrategies, 
   saveStrategyToFirestore, 
