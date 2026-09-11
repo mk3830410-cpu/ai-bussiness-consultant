@@ -14,6 +14,7 @@ import {
 interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: UserProfileData | null;
+  authLoading: boolean;
   loading: boolean;
   isAuthenticated: boolean;
   isEmailVerified: boolean;
@@ -29,7 +30,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Monitor connectivity
@@ -62,6 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    setAuthLoading(true);
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -69,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setUserProfile(null);
       }
-      setLoading(false);
+      setAuthLoading(false);
     });
 
     return () => unsubscribe();
@@ -101,8 +103,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         userProfile,
-        loading,
-        isAuthenticated: !!user,
+        authLoading,
+        loading: authLoading,
+        isAuthenticated: !!user && !authLoading,
         isEmailVerified: !!user?.emailVerified,
         isAnonymous: !!user?.isAnonymous,
         isOnline,
@@ -111,16 +114,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
       }}
     >
-      {loading ? (
+      {authLoading ? (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white px-4">
-          <div className="relative flex items-center justify-center mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 animate-pulse">
-              <span className="text-2xl font-black tracking-wider text-white">S</span>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-600/30">
+              <span className="text-xl font-black tracking-wider text-white">S</span>
             </div>
-            <div className="absolute -inset-2 rounded-2xl border border-indigo-500/30 animate-ping opacity-25"></div>
+            <div className="text-center">
+              <div className="text-sm font-black tracking-widest text-white uppercase">
+                STRAT<span className="text-indigo-400">IQ</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 font-medium">Checking your session...</p>
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-slate-200 mb-1">StratIQ</h2>
-          <p className="text-sm text-slate-400 font-medium">Connecting to AI Co-Founder Workspace...</p>
         </div>
       ) : (
         children

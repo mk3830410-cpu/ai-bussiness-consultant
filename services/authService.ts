@@ -111,6 +111,7 @@ function saveStoredProfiles(profiles: Record<string, UserProfileData>): void {
 /**
  * Setup Realtime Auth State Listener
  * Supports both onAuthStateChanged(callback) and onAuthStateChanged(auth, callback)
+ * Firebase Auth is the single source of truth.
  */
 export function onAuthStateChanged(
   authOrCallback: any,
@@ -126,15 +127,7 @@ export function onAuthStateChanged(
 
   authListeners.add(callback);
 
-  // Immediate notification from local storage
-  const current = getStoredCurrentUser();
-  try {
-    callback(current);
-  } catch (e) {
-    console.error('Error invoking initial auth callback:', e);
-  }
-
-  // Subscribe to Firebase Auth SDK
+  // Subscribe directly to Firebase Auth SDK as single source of truth
   const unsubscribeFirebase = fbOnAuthStateChanged(auth, (fbUser) => {
     if (fbUser) {
       const mapped = mapFirebaseUser(fbUser);
@@ -145,18 +138,18 @@ export function onAuthStateChanged(
         console.error('Error in auth state change callback:', e);
       }
     } else {
-      // If Firebase says signed out and no local guest session
-      if (!current?.isAnonymous) {
-        setStoredCurrentUser(null);
-        try {
-          callback(null);
-        } catch (e) {
-          console.error('Error in auth signout callback:', e);
-        }
+      setStoredCurrentUser(null);
+      try {
+        callback(null);
+      } catch (e) {
+        console.error('Error in auth signout callback:', e);
       }
     }
   }, (error) => {
     console.warn('Firebase onAuthStateChanged notice:', error);
+    try {
+      callback(null);
+    } catch {}
   });
 
   return () => {
@@ -174,71 +167,58 @@ export function getCurrentUser(): AuthUser | null {
   if (auth.currentUser) {
     return mapFirebaseUser(auth.currentUser);
   }
-  return getStoredCurrentUser();
+  return null;
 }
 
 /**
  * Email & Password Login
  */
 export async function loginWithEmail(email: string, pass: string): Promise<AuthUser> {
-  try {
-    const cred = await signInWithEmailAndPassword(auth, email, pass);
-    const user = mapFirebaseUser(cred.user);
-    setStoredCurrentUser(user);
-    await syncUserProfile(user);
-    return user;
-  } catch (fbError: any) {
-    // Graceful fallback for demo accounts if user hasn't created in Firebase Console yet
-    if (fbError.code === 'auth/user-not-found' || fbError.code === 'auth/invalid-credential' || fbError.code === 'auth/configuration-not-found') {
-      const fallbackUser: AuthUser = {
-        uid: `usr_${btoa(email).replace(/=/g, '').substring(0, 16)}`,
-        email,
-        displayName: email.split('@')[0],
-        photoURL: null,
-        emailVerified: true,
-        isAnonymous: false,
-      };
-      setStoredCurrentUser(fallbackUser);
-      await syncUserProfile(fallbackUser);
-      return fallbackUser;
-    }
-    throw fbError;
-  }
+  const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+  const user = mapFirebaseUser(cred.user);
+  setStoredCurrentUser(user);
+  await syncUserProfile(user);
+  return user;
 }
 
 /**
  * Register with Email & Password
+ * Supports both registerWithEmail(email, pass, name) and registerWithEmail(name, email, pass)
  */
 export async function registerWithEmail(
-  email: string, 
-  pass: string, 
-  name?: string
+  arg1: string, 
+  arg2: string, 
+  arg3?: string
 ): Promise<AuthUser> {
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    if (name && cred.user) {
-      await fbUpdateProfile(cred.user, { displayName: name });
-    }
-    const user = mapFirebaseUser(cred.user);
-    if (name) user.displayName = name;
-    setStoredCurrentUser(user);
-    await syncUserProfile(user, { displayName: name || email.split('@')[0] });
-    return user;
-  } catch (fbError: any) {
-    // If Email/Password is not enabled yet in Firebase Console, provide seamless fallback
-    console.warn('Firebase registration fallback:', fbError);
-    const fallbackUser: AuthUser = {
-      uid: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      email,
-      displayName: name || email.split('@')[0],
-      photoURL: null,
-      emailVerified: false,
-      isAnonymous: false,
-    };
-    setStoredCurrentUser(fallbackUser);
-    await syncUserProfile(fallbackUser, { displayName: name || email.split('@')[0] });
-    return fallbackUser;
+  let email = '';
+  let pass = '';
+  let name = '';
+
+  if (arg1.includes('@')) {
+    email = arg1.trim();
+    pass = arg2;
+    name = arg3 || '';
+  } else if (arg2.includes('@')) {
+    name = arg1.trim();
+    email = arg2.trim();
+    pass = arg3 || '';
+  } else {
+    email = arg1.trim();
+    pass = arg2;
+    name = arg3 || '';
   }
+
+  const cred = await createUserWithEmailAndPassword(auth, email, pass);
+  if (name && cred.user) {
+    try {
+      await fbUpdateProfile(cred.user, { displayName: name });
+    } catch {}
+  }
+  const user = mapFirebaseUser(cred.user);
+  if (name) user.displayName = name;
+  setStoredCurrentUser(user);
+  await syncUserProfile(user, { displayName: name || email.split('@')[0] });
+  return user;
 }
 
 /**

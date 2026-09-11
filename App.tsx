@@ -63,6 +63,7 @@ const AppContent: React.FC = () => {
   const { 
     user, 
     userProfile, 
+    authLoading,
     isAuthenticated, 
     isEmailVerified, 
     isAnonymous, 
@@ -71,8 +72,155 @@ const AppContent: React.FC = () => {
     refreshVerification 
   } = useAuth();
 
+  // Route mapping helpers
+  const tabToPath = (tab: AppNavTab): string => {
+    switch (tab) {
+      case 'dashboard': return '/dashboard';
+      case 'new_analysis': return '/new-analysis';
+      case 'saved_strategies': return '/saved-strategies';
+      case 'ideas_vault': return '/idea-vault';
+      case 'advisor': return '/ai-advisor';
+      case 'settings': return '/settings';
+      case 'pricing': return '/pricing';
+      default: return '/dashboard';
+    }
+  };
+
+  const pathToTab = (pathname: string): AppNavTab | null => {
+    const normalized = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+    if (normalized === '/dashboard' || normalized === '/command-center') return 'dashboard';
+    if (normalized === '/new-analysis') return 'new_analysis';
+    if (normalized === '/saved-strategies') return 'saved_strategies';
+    if (normalized === '/idea-vault') return 'ideas_vault';
+    if (normalized === '/ai-advisor') return 'advisor';
+    if (normalized === '/settings' || normalized === '/profile') return 'settings';
+    if (normalized === '/pricing') return 'pricing';
+    return null;
+  };
+
   // Active navigation tab
-  const [currentTab, setCurrentTab] = useState<AppNavTab>('dashboard');
+  const [currentTab, setCurrentTab] = useState<AppNavTab>(() => {
+    if (typeof window !== 'undefined') {
+      const tab = pathToTab(window.location.pathname);
+      return tab || 'dashboard';
+    }
+    return 'dashboard';
+  });
+
+  // Track intended protected destination for post-login redirect
+  const [intendedDestination, setIntendedDestination] = useState<string | null>(null);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup' | 'forgot' | null>(null);
+
+  // Synchronize URL routing & Protected Route Enforcement
+  useEffect(() => {
+    if (authLoading) return;
+
+    const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+
+    if (!user) {
+      // User is logged out
+      const matchedProtectedTab = pathToTab(pathname);
+      if (matchedProtectedTab) {
+        // Protected route accessed without auth -> Redirect to /login and preserve destination
+        setIntendedDestination(pathname);
+        setAuthModalMode('login');
+        window.history.replaceState(null, '', '/login');
+      } else if (pathname === '/login') {
+        setAuthModalMode('login');
+      } else if (pathname === '/signup') {
+        setAuthModalMode('signup');
+      } else if (pathname === '/forgot-password') {
+        setAuthModalMode('forgot');
+      } else {
+        setAuthModalMode(null);
+      }
+    } else {
+      // User is authenticated
+      if (pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password' || pathname === '/') {
+        // Redirect authenticated user away from public auth/home routes to dashboard or intended target
+        const targetPath = intendedDestination || '/dashboard';
+        const targetTab = pathToTab(targetPath) || 'dashboard';
+        setIntendedDestination(null);
+        setAuthModalMode(null);
+        setCurrentTab(targetTab);
+        window.history.replaceState(null, '', tabToPath(targetTab));
+      } else {
+        const matchedTab = pathToTab(pathname);
+        if (matchedTab) {
+          setCurrentTab(matchedTab);
+        }
+      }
+    }
+  }, [user, authLoading, intendedDestination]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+      if (!user) {
+        const matchedTab = pathToTab(pathname);
+        if (matchedTab) {
+          setIntendedDestination(pathname);
+          setAuthModalMode('login');
+          window.history.replaceState(null, '', '/login');
+        } else if (pathname === '/login') {
+          setAuthModalMode('login');
+        } else if (pathname === '/signup') {
+          setAuthModalMode('signup');
+        } else if (pathname === '/forgot-password') {
+          setAuthModalMode('forgot');
+        } else {
+          setAuthModalMode(null);
+        }
+      } else {
+        const matchedTab = pathToTab(pathname);
+        if (matchedTab) {
+          setCurrentTab(matchedTab);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [user]);
+
+  const handleNavigateTab = (tab: AppNavTab) => {
+    setCurrentTab(tab);
+    const newPath = tabToPath(tab);
+    if (window.location.pathname !== newPath) {
+      window.history.pushState(null, '', newPath);
+    }
+  };
+
+  const handleOpenLogin = () => {
+    setAuthModalMode('login');
+    if (window.location.pathname !== '/login') {
+      window.history.pushState(null, '', '/login');
+    }
+  };
+
+  const handleOpenSignup = () => {
+    setAuthModalMode('signup');
+    if (window.location.pathname !== '/signup') {
+      window.history.pushState(null, '', '/signup');
+    }
+  };
+
+  const handleLogoutSuccess = () => {
+    setIntendedDestination(null);
+    setAuthModalMode(null);
+    setCurrentTab('dashboard');
+    window.history.pushState(null, '', '/');
+  };
+
+  const handleLoginSuccess = () => {
+    const targetPath = intendedDestination || '/dashboard';
+    const targetTab = pathToTab(targetPath) || 'dashboard';
+    setIntendedDestination(null);
+    setAuthModalMode(null);
+    setCurrentTab(targetTab);
+    window.history.replaceState(null, '', tabToPath(targetTab));
+  };
 
   // App State
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('deep');
@@ -473,7 +621,14 @@ const AppContent: React.FC = () => {
 
   // If unauthenticated, display the SaaS landing page with signup / login
   if (!user) {
-    return <LandingPage />;
+    return (
+      <LandingPage 
+        initialAuthMode={authModalMode}
+        onOpenLogin={handleOpenLogin}
+        onOpenSignup={handleOpenSignup}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    );
   }
 
   const currentPlan = userProfile?.subscriptionPlan || 'free';
@@ -483,7 +638,8 @@ const AppContent: React.FC = () => {
       <div>
         <Header 
           currentTab={currentTab}
-          onSelectTab={setCurrentTab}
+          onSelectTab={handleNavigateTab}
+          onLogout={handleLogoutSuccess}
           avatarUrl={user.photoURL} 
           userEmail={user.email}
           displayName={userProfile?.displayName || user.displayName}

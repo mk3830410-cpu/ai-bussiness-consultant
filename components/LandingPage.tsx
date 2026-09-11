@@ -4,7 +4,10 @@ import AuthForm from './AuthForm';
 import { BrainCircuit, Zap, BarChart, Eye, CheckCircle, ArrowRight, Star, Rocket, TrendingUp } from 'lucide-react';
 
 interface LandingPageProps {
-  // onLogin prop removed as Supabase handles auth state globally
+  initialAuthMode?: 'login' | 'signup' | 'forgot' | null;
+  onLoginSuccess?: () => void;
+  onOpenLogin?: () => void;
+  onOpenSignup?: () => void;
 }
 
 const features = [
@@ -55,12 +58,23 @@ const testimonials = [
   }
 ];
 
-const LandingPage: React.FC<LandingPageProps> = () => {
-  const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
+const LandingPage: React.FC<LandingPageProps> = ({
+  initialAuthMode = null,
+  onLoginSuccess,
+  onOpenLogin,
+  onOpenSignup,
+}) => {
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot' | null>(initialAuthMode);
   const [isVisible, setIsVisible] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const featuresRef = useRef<HTMLDivElement>(null);
   const testimonialsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialAuthMode) {
+      setAuthMode(initialAuthMode);
+    }
+  }, [initialAuthMode]);
 
   useEffect(() => {
     setIsVisible(true);
@@ -93,8 +107,10 @@ const LandingPage: React.FC<LandingPageProps> = () => {
     };
   }, []);
 
-  const openAuthModal = (mode: 'login' | 'signup') => {
+  const openAuthModal = (mode: 'login' | 'signup' | 'forgot') => {
     setAuthMode(mode);
+    if (mode === 'login' && onOpenLogin) onOpenLogin();
+    if (mode === 'signup' && onOpenSignup) onOpenSignup();
   };
 
   const closeAuthModal = () => {
@@ -131,11 +147,14 @@ const LandingPage: React.FC<LandingPageProps> = () => {
         ))}
       </div>
 
-      <Header />
+      <Header 
+        onOpenLogin={() => openAuthModal('login')} 
+        onOpenSignup={() => openAuthModal('signup')} 
+      />
       
       <main className="relative z-10">
         {/* Hero Section */}
-        <section className="text-center py-16 md:py-28 px-4 relative overflow-hidden">
+        <section id="home" className="text-center py-16 md:py-28 px-4 relative overflow-hidden">
           <div className={`container mx-auto max-w-6xl transition-all duration-1000 transform ${
             isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
           }`}>
@@ -189,7 +208,7 @@ const LandingPage: React.FC<LandingPageProps> = () => {
         </section>
 
         {/* Features Section */}
-        <section ref={featuresRef} className="py-20 bg-gray-800/30 border-y border-gray-700/50 relative">
+        <section id="features" ref={featuresRef} className="py-20 bg-gray-800/30 border-y border-gray-700/50 relative">
           <div className="container mx-auto px-4 max-w-6xl">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-4">
@@ -232,8 +251,8 @@ const LandingPage: React.FC<LandingPageProps> = () => {
           </div>
         </section>
 
-        {/* Testimonials Section */}
-        <section ref={testimonialsRef} className="py-20 relative">
+        {/* Testimonials / How It Works Section */}
+        <section id="how-it-works" ref={testimonialsRef} className="py-20 relative">
           <div className="container mx-auto px-4 max-w-6xl">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-4">
@@ -275,7 +294,7 @@ const LandingPage: React.FC<LandingPageProps> = () => {
         </section>
 
         {/* Pricing/CTA Section */}
-        <section className="py-20 text-center relative">
+        <section id="pricing" className="py-20 text-center relative">
           <div className="container mx-auto px-4 max-w-4xl">
             <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 md:p-12 border border-gray-700/50 shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -translate-y-16 translate-x-16" />
@@ -327,6 +346,7 @@ const LandingPage: React.FC<LandingPageProps> = () => {
         <AuthForm 
           mode={authMode} 
           onClose={closeAuthModal} 
+          onSuccess={onLoginSuccess}
         />
       )}
     </div>
