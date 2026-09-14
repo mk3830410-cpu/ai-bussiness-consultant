@@ -83,7 +83,11 @@ export const getSavedStrategies = (userId?: string): SavedStrategy[] => {
       return initial;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [DEMO_SAMPLE_STRATEGY];
+    if (Array.isArray(parsed)) {
+      const valid = parsed.filter((s): s is SavedStrategy => Boolean(s && typeof s === 'object' && s.id));
+      return valid.length > 0 ? valid : [DEMO_SAMPLE_STRATEGY];
+    }
+    return [DEMO_SAMPLE_STRATEGY];
   } catch (err) {
     console.error('Error reading saved strategies:', err);
     return [DEMO_SAMPLE_STRATEGY];
@@ -157,7 +161,7 @@ export const updateStrategyStatus = (
 ): void => {
   try {
     const current = getSavedStrategies(userId);
-    const updated = current.map(s => s.id === id ? { ...s, status, updatedAt: Date.now() } : s);
+    const updated = current.map(s => s && s.id === id ? { ...s, status, updatedAt: Date.now() } : s).filter(Boolean);
     localStorage.setItem(getStorageKey(userId), JSON.stringify(updated));
 
     const currentUid = userId || auth.currentUser?.uid;
@@ -242,6 +246,7 @@ export const getBusinessIdeas = (userId?: string): BusinessIdeaItem[] => {
           industry: 'LegalTech',
           tags: ['SaaS', 'Freelance', 'AI'],
           createdAt: Date.now() - 86400000 * 3,
+          status: 'exploring',
         },
         {
           id: 'idea_2',
@@ -250,12 +255,26 @@ export const getBusinessIdeas = (userId?: string): BusinessIdeaItem[] => {
           industry: 'PetCare & Marketplace',
           tags: ['Marketplace', 'Trust & Safety', 'Mobile'],
           createdAt: Date.now() - 86400000 * 5,
+          status: 'new',
+        },
+        {
+          id: 'idea_3',
+          title: 'Autonomous Cold-Email Personalizer for B2B Agencies',
+          description: 'Deep-scrapes prospect LinkedIn posts, GitHub activity, and company earnings transcripts to write hyper-personalized 1-to-1 outreach emails.',
+          industry: 'SaaS & Software',
+          tags: ['B2B', 'AI', 'Sales'],
+          createdAt: Date.now() - 86400000 * 1,
+          status: 'validated',
         },
       ];
       localStorage.setItem(key, JSON.stringify(initial));
       return initial;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((i): i is BusinessIdeaItem => Boolean(i && typeof i === 'object' && i.id));
+    }
+    return [];
   } catch (err) {
     console.error('Error reading business ideas:', err);
     return [];
@@ -265,7 +284,7 @@ export const getBusinessIdeas = (userId?: string): BusinessIdeaItem[] => {
 export const syncIdeasWithLocal = (ideas: BusinessIdeaItem[], userId?: string) => {
   try {
     const key = getIdeasKey(userId);
-    localStorage.setItem(key, JSON.stringify(ideas));
+    localStorage.setItem(key, JSON.stringify((ideas || []).filter(Boolean)));
   } catch {}
 };
 
@@ -280,7 +299,7 @@ export const saveBusinessIdea = (idea: BusinessIdeaItem, userId?: string): void 
     } else {
       updated = [idea, ...current];
     }
-    localStorage.setItem(getIdeasKey(userId), JSON.stringify(updated));
+    localStorage.setItem(getIdeasKey(userId), JSON.stringify(updated.filter(Boolean)));
 
     const currentUid = userId || auth.currentUser?.uid;
     if (currentUid) {
@@ -296,7 +315,7 @@ export const saveBusinessIdea = (idea: BusinessIdeaItem, userId?: string): void 
 export const deleteBusinessIdea = (id: string, userId?: string): void => {
   try {
     const current = getBusinessIdeas(userId);
-    const updated = current.filter(i => i.id !== id);
+    const updated = current.filter(i => i && i.id !== id);
     localStorage.setItem(getIdeasKey(userId), JSON.stringify(updated));
 
     const currentUid = userId || auth.currentUser?.uid;
@@ -311,19 +330,23 @@ export const deleteBusinessIdea = (id: string, userId?: string): void => {
 };
 
 export const getDashboardStats = (userId?: string, cachedStrategies?: SavedStrategy[], cachedIdeas?: BusinessIdeaItem[]) => {
-  const strategies = cachedStrategies || getSavedStrategies(userId);
-  const ideas = cachedIdeas || getBusinessIdeas(userId);
+  const rawStrategies = cachedStrategies || getSavedStrategies(userId);
+  const rawIdeas = cachedIdeas || getBusinessIdeas(userId);
+
+  const strategies = (Array.isArray(rawStrategies) ? rawStrategies : []).filter((s): s is SavedStrategy => Boolean(s && typeof s === 'object'));
+  const ideas = (Array.isArray(rawIdeas) ? rawIdeas : []).filter((i): i is BusinessIdeaItem => Boolean(i && typeof i === 'object'));
 
   const totalAnalyzed = strategies.length;
-  const strategiesGenerated = strategies.filter(s => s.status !== 'draft').length;
+  const strategiesGenerated = strategies.filter(s => s && s.status !== 'draft').length;
   
   let marketOpportunities = 0;
   let totalScore = 0;
 
   strategies.forEach(s => {
+    if (!s) return;
     const opps = (s.result as any)?.marketAnalysis?.swot?.opportunities?.length || 3;
     marketOpportunities += opps;
-    const score = (s.result as any)?.businessScore?.overallScore || (s.result as any)?.businessOpportunityScore?.overallScore || (s.result as any)?.ideaValidation?.score * 10 || s.score || 75;
+    const score = (s.result as any)?.businessScore?.overallScore || (s.result as any)?.businessOpportunityScore?.overallScore || ((s.result as any)?.ideaValidation?.score ? Math.round((s.result as any).ideaValidation.score * 10) : null) || s.score || 75;
     totalScore += score;
   });
 

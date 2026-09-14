@@ -15,9 +15,13 @@ import {
   Download,
   Copy,
   Clock,
-  Sparkles
+  Sparkles,
+  ArrowLeftRight,
+  FileCode
 } from 'lucide-react';
 import { SavedStrategy } from '../types';
+import { StrategyComparison } from './StrategyComparison';
+import { downloadStrategyMarkdown } from '../services/markdownExportService';
 
 interface SavedStrategiesViewProps {
   strategies: SavedStrategy[];
@@ -44,14 +48,22 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [comparing, setComparing] = useState(false);
+  const [compareInitialA, setCompareInitialA] = useState<string | undefined>();
+  const [compareInitialB, setCompareInitialB] = useState<string | undefined>();
 
-  const filtered = strategies.filter((item) => {
+  const filtered = (strategies || []).filter((item): item is SavedStrategy => {
+    if (!item) return false;
+    const bName = item.businessName || '';
+    const ind = item.industry || '';
+    const idea = item.inputs?.businessIdea || '';
     const matchesSearch = 
-      item.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.inputs?.businessIdea || '').toLowerCase().includes(searchTerm.toLowerCase());
+      bName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ind.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      idea.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+    const itemStatus = item.status || 'validated';
+    const matchesStatus = statusFilter === 'all' || itemStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -87,6 +99,23 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
     }
   };
 
+  if (comparing) {
+    return (
+      <div className="space-y-6">
+        <StrategyComparison
+          strategies={strategies}
+          initialStrategyAId={compareInitialA}
+          initialStrategyBId={compareInitialB}
+          onClose={() => setComparing(false)}
+          onOpenStrategy={(st) => {
+            setComparing(false);
+            onOpenStrategy(st);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -101,13 +130,30 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onCreateNew}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-md hover:shadow-indigo-500/20 flex items-center gap-2 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Analysis</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          {strategies.length >= 2 && (
+            <button
+              onClick={() => {
+                setCompareInitialA(strategies[0]?.id);
+                setCompareInitialB(strategies[1]?.id);
+                setComparing(true);
+              }}
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-indigo-300 hover:text-white border border-slate-700 hover:border-indigo-500/50 font-semibold rounded-xl text-sm transition-all duration-200 shadow-sm flex items-center gap-2 shrink-0"
+              title="Compare two strategies side-by-side"
+            >
+              <ArrowLeftRight className="w-4 h-4 text-indigo-400" />
+              <span>Compare Strategies</span>
+            </button>
+          )}
+
+          <button
+            onClick={onCreateNew}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-md hover:shadow-indigo-500/20 flex items-center gap-2 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Analysis</span>
+          </button>
+        </div>
       </div>
 
       {/* Controls: Search and Filter */}
@@ -160,11 +206,11 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((strategy) => {
-            const statusInfo = getStatusBadge(strategy.status);
-            const score = strategy.score || 80;
-            const isEditing = editingId === strategy.id;
-            const createdAtDate = new Date(strategy.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-            const updatedAtDate = strategy.updatedAt ? new Date(strategy.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : createdAtDate;
+            const statusInfo = getStatusBadge(strategy?.status || 'validated');
+            const score = strategy?.score || 80;
+            const isEditing = editingId === strategy?.id;
+            const createdAtDate = strategy?.createdAt ? new Date(strategy.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent';
+            const updatedAtDate = strategy?.updatedAt ? new Date(strategy.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : createdAtDate;
 
             return (
               <div
@@ -259,7 +305,7 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
                 <div className="flex items-center justify-between pt-3 border-t border-slate-800 mt-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5">
                     <select
-                      value={strategy.status}
+                      value={strategy?.status || 'validated'}
                       onChange={(e) => onUpdateStatus(strategy.id, e.target.value as any)}
                       className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none"
                     >
@@ -273,11 +319,23 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
                       <button
                         onClick={() => onExportPdf(strategy)}
                         className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
-                        title="Download Strategy Report"
+                        title="Download Strategy Report (PDF)"
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
                     )}
+
+                    <button
+                      onClick={() => {
+                        downloadStrategyMarkdown(strategy.analysisResult, 'deep', {
+                          conceptTitle: strategy.businessName,
+                        });
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+                      title="Export as Markdown (.md) for Notion, Obsidian, Jira, or Linear"
+                    >
+                      <FileCode className="w-3.5 h-3.5" />
+                    </button>
 
                     {onDuplicateStrategy && (
                       <button
@@ -286,6 +344,22 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
                         title="Duplicate Strategy"
                       >
                         <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {strategies.length >= 2 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCompareInitialA(strategy.id);
+                          const other = strategies.find(s => s.id !== strategy.id);
+                          setCompareInitialB(other?.id);
+                          setComparing(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+                        title="Compare with another strategy"
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>

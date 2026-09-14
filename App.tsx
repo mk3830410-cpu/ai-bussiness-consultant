@@ -253,6 +253,7 @@ const AppContent: React.FC = () => {
   const [savedStrategies, setSavedStrategies] = useState<SavedStrategy[]>(() => getSavedStrategies(user?.uid));
   const [savedIdeas, setSavedIdeas] = useState<BusinessIdeaItem[]>(() => getSavedIdeas(user?.uid));
   const [wizardPrefill, setWizardPrefill] = useState<Partial<WizardData> | null>(null);
+  const [currentWizardData, setCurrentWizardData] = useState<WizardData | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -361,9 +362,12 @@ const AppContent: React.FC = () => {
     let newSaved: SavedStrategy;
     if (user) {
       try {
-        newSaved = await saveStrategyToFirestore(user.uid, strategyPayload);
-        setSavedStrategies(prev => [newSaved, ...prev.filter(s => s.id !== newSaved.id)]);
-        syncStrategiesWithLocal([newSaved, ...savedStrategies], user.uid);
+        const savedResult = await saveStrategyToFirestore(user.uid, strategyPayload);
+        newSaved = typeof savedResult === 'string'
+          ? { ...strategyPayload, id: savedResult, createdAt: Date.now(), updatedAt: Date.now() }
+          : savedResult;
+        setSavedStrategies(prev => [newSaved, ...(prev || []).filter(s => s && s.id !== newSaved.id)]);
+        syncStrategiesWithLocal([newSaved, ...(savedStrategies || []).filter(Boolean)], user.uid);
       } catch (e) {
         console.warn('Falling back to local strategy save:', e);
         newSaved = {
@@ -372,7 +376,7 @@ const AppContent: React.FC = () => {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
-        setSavedStrategies(prev => [newSaved, ...prev]);
+        setSavedStrategies(prev => [newSaved, ...(prev || []).filter(Boolean)]);
       }
     } else {
       newSaved = {
@@ -381,7 +385,7 @@ const AppContent: React.FC = () => {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
-      setSavedStrategies(prev => [newSaved, ...prev]);
+      setSavedStrategies(prev => [newSaved, ...(prev || []).filter(Boolean)]);
     }
 
     setActiveStrategy(newSaved);
@@ -453,6 +457,7 @@ const AppContent: React.FC = () => {
     trackEvent('wizard_generate_strategy', 'User', selectedMode);
 
     try {
+      setCurrentWizardData(wizardData);
       const result = await generateStrategy(selectedMode, composedText, uploadedImage);
       await handleStrategyReceived(result, selectedMode, {
         businessName: wizardData.businessName,
@@ -495,12 +500,27 @@ const AppContent: React.FC = () => {
     setAnalysisResult(strat.result);
     setAnalysisMode(strat.mode || 'deep');
     setUserInput(strat.inputs?.userInput || strat.inputs?.businessIdea || '');
+    if (strat.inputs) {
+      setCurrentWizardData({
+        businessName: strat.businessName || '',
+        businessIdea: strat.inputs.businessIdea || '',
+        industry: strat.industry || '',
+        targetCustomer: strat.inputs.targetCustomer || '',
+        location: strat.inputs.location || '',
+        businessModel: strat.inputs.businessModel || '',
+        primaryGoal: strat.inputs.primaryGoal || '',
+        targetRevenue: strat.inputs.targetRevenue || '',
+        timeline: strat.inputs.timeline || '',
+        stage: strat.stage || '',
+        budget: strat.inputs.budget || '',
+      });
+    }
     setCurrentTab('new_analysis');
     showToast(`Loaded "${strat.businessName}" strategy report`, 'info');
   };
 
   const handleRenameStrategy = async (id: string, newName: string) => {
-    setSavedStrategies(prev => prev.map(s => s.id === id ? { ...s, businessName: newName, updatedAt: Date.now() } : s));
+    setSavedStrategies(prev => (prev || []).map(s => s && s.id === id ? { ...s, businessName: newName, updatedAt: Date.now() } : s).filter(Boolean));
     if (user) {
       try {
         await updateStrategyInFirestore(user.uid, id, { businessName: newName });
@@ -512,7 +532,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleUpdateStatus = async (id: string, newStatus: SavedStrategy['status']) => {
-    setSavedStrategies(prev => prev.map(s => s.id === id ? { ...s, status: newStatus, updatedAt: Date.now() } : s));
+    setSavedStrategies(prev => (prev || []).map(s => s && s.id === id ? { ...s, status: newStatus, updatedAt: Date.now() } : s).filter(Boolean));
     if (user) {
       try {
         await updateStrategyInFirestore(user.uid, id, { status: newStatus });
@@ -525,7 +545,7 @@ const AppContent: React.FC = () => {
 
   const handleDeleteStrategy = async (id: string) => {
     if (confirm('Are you sure you want to permanently delete this strategy from your cloud workspace?')) {
-      setSavedStrategies(prev => prev.filter(s => s.id !== id));
+      setSavedStrategies(prev => (prev || []).filter(s => s && s.id !== id));
       if (user) {
         try {
           await deleteStrategyFromFirestore(user.uid, id);
@@ -554,12 +574,12 @@ const AppContent: React.FC = () => {
         const saved = await saveIdeaToFirestore(user.uid, newIdea);
         setSavedIdeas(prev => [saved, ...prev.filter(i => i.id !== saved.id)]);
       } catch (e) {
-        setSavedIdeas(prev => [newIdea, ...prev]);
+        setSavedIdeas(prev => [newIdea, ...prev.filter(i => i.id !== newIdea.id)]);
       }
     } else {
-      setSavedIdeas(prev => [newIdea, ...prev]);
+      setSavedIdeas(prev => [newIdea, ...prev.filter(i => i.id !== newIdea.id)]);
     }
-    showToast('Saved to Business Idea Vault in Firestore', 'success');
+    showToast('Saved to Business Idea Vault', 'success');
   };
 
   const handleDeleteIdea = async (id: string) => {
@@ -765,6 +785,7 @@ const AppContent: React.FC = () => {
                   comments={comments}
                   onAddComment={handleAddComment}
                   isCollaborative={currentPlan === 'enterprise'}
+                  wizardData={currentWizardData}
                 />
               )}
             </div>

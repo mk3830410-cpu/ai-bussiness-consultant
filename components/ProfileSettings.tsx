@@ -35,7 +35,7 @@ import {
 } from '../services/firestoreService';
 
 interface ProfileSettingsProps {
-  user: FirebaseUser;
+  user: FirebaseUser | null;
   profile: UserProfileData | null;
   onBack: () => void;
   onProfileUpdate: () => void;
@@ -63,7 +63,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security'>('profile');
   
   // Profile state
-  const [name, setName] = useState(user.displayName || profile?.displayName || '');
+  const [name, setName] = useState(user?.displayName || profile?.displayName || '');
   const [role, setRole] = useState(profile?.role || 'Founder & CEO');
   const [savingProfile, setSavingProfile] = useState(false);
   
@@ -88,11 +88,12 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Provider detection
-  const providerId = user.providerData?.[0]?.providerId || (user.isAnonymous ? 'anonymous' : 'password');
+  const providerId = user?.providerData?.[0]?.providerId || (user?.isAnonymous ? 'anonymous' : 'password');
   const isPasswordProvider = providerId === 'password';
 
   useEffect(() => {
     async function loadSettings() {
+      if (!user?.uid) return;
       try {
         const data = await fetchUserSettings(user.uid);
         setPreferences(data);
@@ -101,7 +102,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
       }
     }
     loadSettings();
-  }, [user.uid]);
+  }, [user?.uid]);
 
   const showFeedback = (type: 'success' | 'error', text: string) => {
     setFeedback({ type, text });
@@ -150,6 +151,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
 
   const handlePreferencesSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.uid) return;
     setSavingPreferences(true);
     try {
       await saveUserSettings(user.uid, preferences);
@@ -174,7 +176,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   };
 
   const handleDeleteAccount = async () => {
-    if (confirmEmailInput.trim() !== user.email && !user.isAnonymous) {
+    if (confirmEmailInput.trim() !== (user?.email || '') && !user?.isAnonymous) {
       showFeedback('error', 'Please type your exact email to confirm deletion.');
       return;
     }
@@ -205,9 +207,26 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
     }
   };
 
-  const formattedJoinDate = user.metadata.creationTime 
-    ? new Date(user.metadata.creationTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const creationTime = user?.metadata?.creationTime;
+  const formattedJoinDate = creationTime 
+    ? new Date(creationTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : 'Recent';
+
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn text-center py-16">
+        <p className="text-slate-400">Please sign in to view account settings.</p>
+        <button 
+          onClick={onBack} 
+          className="mt-4 inline-flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 font-medium"
+        >
+          <ArrowLeft size={16} /> Back to Dashboard
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">

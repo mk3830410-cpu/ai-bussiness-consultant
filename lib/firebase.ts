@@ -3,9 +3,25 @@ import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import localConfig from '../firebase-applet-config.json';
 
+// Canonical Firebase project auth domain: ai-bussiness-consultant-9e923.firebaseapp.com
+const FIREBASE_PROJECT_AUTH_DOMAIN = localConfig.authDomain || `${localConfig.projectId}.firebaseapp.com`;
+
+// Requirement 3: Do NOT set authDomain to the Vercel URL unless the project is intentionally configured to use a Firebase custom auth domain.
+const resolveAuthDomain = (): string => {
+  const envAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  if (envAuthDomain && typeof envAuthDomain === 'string') {
+    const trimmed = envAuthDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    // Filter out accidental Vercel/host URLs and fallback to Firebase project domain
+    if (!trimmed.includes('vercel.app') && !trimmed.includes('localhost') && !trimmed.includes('run.app') && trimmed.includes('.')) {
+      return trimmed;
+    }
+  }
+  return FIREBASE_PROJECT_AUTH_DOMAIN;
+};
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || localConfig.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || localConfig.authDomain,
+  authDomain: resolveAuthDomain(),
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || localConfig.projectId,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || localConfig.storageBucket,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || localConfig.messagingSenderId,
@@ -15,4 +31,4 @@ const firebaseConfig = {
 
 export const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth: Auth = getAuth(app);
-export const db: Firestore = getFirestore(app);
+export const db: Firestore = getFirestore(app, localConfig.firestoreDatabaseId || '(default)');

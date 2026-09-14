@@ -9,9 +9,17 @@ import { CommentSection } from './CollaborationTools';
 import { FinancialCharts } from './FinancialCharts';
 import { useToast } from './Toast';
 import { exportStrategyToPdf } from '../services/pdfExportService';
+import { exportFinancialProjectionsCsv } from '../services/financialExport';
+import { downloadStrategyMarkdown, copyStrategyMarkdownToClipboard } from '../services/markdownExportService';
 import { SWOTQuadrantGrid } from './SWOTQuadrantGrid';
+import { SWOTAnalysisSection } from './SWOTAnalysisSection';
+import { PrintPreviewModal } from './PrintPreviewModal';
 import { BusinessScoreCard } from './BusinessScoreCard';
-import { ShieldAlert, ListOrdered, Coins, Users2, Printer, Layers, Compass } from 'lucide-react';
+import { PitchDeckCarousel } from './PitchDeckCarousel';
+import { BudgetCalculator } from './BudgetCalculator';
+import { MilestoneTimelineWidget } from './MilestoneTimelineWidget';
+import { WizardData } from '../types';
+import { ShieldAlert, ListOrdered, Coins, Users2, Printer, Layers, Compass, FileCode, Calculator, Calendar, ArrowLeft } from 'lucide-react';
 
 // --- PDF Export Modal Component ---
 interface ExportPdfModalProps {
@@ -87,6 +95,7 @@ interface ResultsPanelProps {
   comments: Comment[];
   onAddComment: (sectionId: string, text: string) => void;
   isCollaborative: boolean;
+  wizardData?: WizardData | null;
 }
 
 interface PrintableReportProps {
@@ -99,6 +108,9 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
   const { showToast } = useToast();
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [activeResultsTab, setActiveResultsTab] = useState<'blueprint' | 'pitchdeck' | 'budget' | 'roadmap'>('blueprint');
   
   // Collaboration State
   const [activeCommentSection, setActiveCommentSection] = useState<string | null>(null);
@@ -114,6 +126,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
         { id: 'growthHackingTips', title: 'Growth Hacking', icon: <Megaphone size={16}/> },
         { id: 'pricingModels', title: 'Pricing Models', icon: <ShoppingCart size={16}/> },
         { id: 'monetizationPlan', title: 'Monetization Plan', icon: <DollarSign size={16}/> },
+        { id: 'budgetCalculator', title: 'Startup Budget Breakdown', icon: <Calculator size={16}/> },
+        { id: 'milestoneTimeline', title: 'Milestone Roadmap', icon: <Calendar size={16}/> },
         { id: 'pitchDeck', title: 'Pitch Deck Outline', icon: <Briefcase size={16}/> },
         { id: 'legalInsights', title: 'Legal Insights', icon: <Shield size={16}/> },
   ], []);
@@ -234,6 +248,67 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
     }
   };
 
+  const handleExportFinancialsCsv = () => {
+    if (!props.analysisResult) return;
+    const deep = props.analysisResult as any;
+    const projections = deep?.financialProjections;
+    if (!projections || projections.length === 0) {
+      showToast('No financial projections available to export.', 'error');
+      return;
+    }
+    setIsExportingCsv(true);
+    try {
+      const businessName =
+        deep?.brandIdentity?.companyNameSuggestions?.[0] ||
+        deep?.conceptTitle ||
+        'venture';
+      exportFinancialProjectionsCsv(projections, businessName);
+      showToast('Financial projections exported', 'success', 'download');
+    } catch (err: any) {
+      console.error('CSV export failed:', err);
+      showToast("Couldn't export financial projections. Please try again.", 'error');
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
+
+  const handleExportMarkdown = () => {
+    if (!props.analysisResult) return;
+    try {
+      const companyName =
+        (props.analysisResult as any)?.brandIdentity?.companyNameSuggestions?.[0] ||
+        (props.analysisResult as any)?.conceptTitle ||
+        'StratIQ Strategy';
+      downloadStrategyMarkdown(props.analysisResult, props.analysisMode, {
+        conceptTitle: companyName,
+      });
+      showToast('Markdown exported! Ready for Notion, Obsidian, or Jira.', 'success', 'download');
+    } catch (err) {
+      console.error('Failed to export markdown:', err);
+      showToast('Failed to export Markdown', 'error');
+    }
+  };
+
+  const handleCopyMarkdown = async () => {
+    if (!props.analysisResult) return;
+    try {
+      const companyName =
+        (props.analysisResult as any)?.brandIdentity?.companyNameSuggestions?.[0] ||
+        (props.analysisResult as any)?.conceptTitle ||
+        'StratIQ Strategy';
+      const success = await copyStrategyMarkdownToClipboard(props.analysisResult, props.analysisMode, {
+        conceptTitle: companyName,
+      });
+      if (success) {
+        showToast('Full Markdown copied! Paste directly into Notion or Jira.', 'success', 'copy');
+      } else {
+        showToast('Failed to copy Markdown', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to copy Markdown', 'error');
+    }
+  };
+
   const handleCopySummary = () => {
     if (!props.analysisResult) return;
     const res = props.analysisResult as any;
@@ -274,14 +349,23 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
       isCollaborative: props.isCollaborative,
       onCommentClick: toggleComments,
       activeComments: activeCommentSection,
-      allComments: props.comments
+      allComments: props.comments,
+      onOpenPitchDeck: () => setActiveResultsTab('pitchdeck')
   };
 
   const modeMap = {
     deep: {
         icon: BrainCircuit,
         title: "Deep Dive Strategy",
-        component: <DeepDiveResults strategy={props.analysisResult as StrategyResponse} logoImageUrl={props.logoImageUrl} isLogoLoading={props.isLogoLoading} context={renderContext} />
+        component: (
+          <DeepDiveResults 
+            strategy={props.analysisResult as StrategyResponse} 
+            logoImageUrl={props.logoImageUrl} 
+            isLogoLoading={props.isLogoLoading} 
+            context={renderContext} 
+            wizardData={props.wizardData}
+          />
+        )
     },
     market: {
         icon: Search,
@@ -311,6 +395,19 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
         sections={deepDiveSections}
       />
 
+      <PrintPreviewModal
+        isOpen={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        result={props.analysisResult}
+        mode={props.analysisMode}
+        businessName={
+          (props.analysisResult as any)?.brandIdentity?.companyNameSuggestions?.[0] ||
+          (props.analysisResult as any)?.conceptTitle ||
+          'StratIQ Business Strategy'
+        }
+        logoImageUrl={props.logoImageUrl}
+      />
+
       <CommentSection 
         isOpen={!!activeCommentSection}
         onClose={() => setActiveCommentSection(null)}
@@ -335,6 +432,39 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
            </button>
 
            <button
+             id="copy-markdown-btn"
+             onClick={handleCopyMarkdown}
+             className="hidden md:inline-flex items-center justify-center px-3 py-2 text-xs md:text-sm font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-750 hover:text-white hover:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all"
+             title="Copy full Markdown to clipboard to paste directly into Notion, Jira, or GitHub"
+           >
+             <Copy size={14} className="mr-1.5 text-indigo-400" />
+             Copy .MD
+           </button>
+
+           <button
+             id="export-markdown-btn"
+             onClick={handleExportMarkdown}
+             className="inline-flex items-center justify-center px-3.5 py-2 text-xs md:text-sm font-semibold text-indigo-200 bg-indigo-950/60 border border-indigo-500/40 rounded-xl hover:bg-indigo-900/70 hover:text-white hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all shadow-sm"
+             title="Download strategy as Markdown (.md) for Notion, Obsidian, Jira, Linear, or GitHub"
+           >
+             <FileCode size={15} className="mr-1.5 text-indigo-400" />
+             <span>Export Markdown</span>
+           </button>
+
+           {(props.analysisResult as any)?.financialProjections?.length > 0 && (
+             <button
+               id="export-financials-csv-btn"
+               onClick={handleExportFinancialsCsv}
+               disabled={isExportingCsv}
+               className="inline-flex items-center justify-center px-3.5 py-2 text-xs md:text-sm font-semibold text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 rounded-xl hover:bg-emerald-900/60 hover:text-white hover:border-emerald-500/70 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all shadow-sm"
+               title="Export financial projections directly to CSV"
+             >
+               <Download size={15} className="mr-1.5 text-emerald-400" />
+               <span>{isExportingCsv ? 'Exporting...' : 'Export Financials CSV'}</span>
+             </button>
+           )}
+
+           <button
              id="export-json-btn"
              onClick={handleExportCSV}
              disabled={isExportingPDF}
@@ -346,42 +476,125 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
            </button>
 
            <button
-             id="download-pdf-btn"
-             onClick={handleDownloadPdfDirect}
-             disabled={isExportingPDF}
-             className="inline-flex items-center justify-center px-4 py-2 text-xs md:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-550 active:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed shadow-lg shadow-indigo-900/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/40 transition-all"
-             title="Download full business strategy report as PDF"
+             id="print-export-pdf-btn"
+             onClick={() => setShowPrintPreview(true)}
+             className="inline-flex items-center justify-center px-4 py-2 text-xs md:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-550 active:bg-indigo-700 shadow-lg shadow-indigo-900/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/40 transition-all"
+             title="Open Print Preview to customize sections, print, or download PDF"
            >
-             {isExportingPDF ? (
-               <>
-                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                 </svg>
-                 <span>Generating PDF...</span>
-               </>
-             ) : (
-               <>
-                 <FileDown size={16} className="mr-2" />
-                 Download as PDF
-               </>
-             )}
+             <FileDown size={16} className="mr-2" />
+             <span>Print / Export PDF</span>
            </button>
-
-           {props.analysisMode === 'deep' && (
-             <button
-               onClick={handleInitiatePdfExport}
-               disabled={isExportingPDF}
-               className="hidden lg:inline-flex text-xs text-gray-400 hover:text-indigo-300 underline px-1 py-1"
-               title="Customize which sections appear in the PDF"
-             >
-               Custom...
-             </button>
-           )}
         </div>
       </div>
+
+      {/* Mode View Switcher for Deep Dive (Blueprint vs Pitch Deck vs Budget vs Roadmap) */}
+      {props.analysisMode === 'deep' && (
+        <div className="flex items-center justify-center mb-8 overflow-x-auto px-2">
+          <div className="inline-flex p-1.5 bg-gray-900/90 border border-gray-700/80 rounded-2xl shadow-xl flex-wrap sm:flex-nowrap gap-1">
+            <button
+              id="tab-blueprint-btn"
+              type="button"
+              onClick={() => setActiveResultsTab('blueprint')}
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+                activeResultsTab === 'blueprint'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+              }`}
+            >
+              <FileText size={16} />
+              <span>Full Strategy Blueprint</span>
+            </button>
+
+            <button
+              id="tab-pitchdeck-btn"
+              type="button"
+              onClick={() => setActiveResultsTab('pitchdeck')}
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+                activeResultsTab === 'pitchdeck'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+              }`}
+            >
+              <Briefcase size={16} />
+              <span>Pitch Deck (Carousel)</span>
+            </button>
+
+            <button
+              id="tab-budget-btn"
+              type="button"
+              onClick={() => setActiveResultsTab('budget')}
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+                activeResultsTab === 'budget'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+              }`}
+            >
+              <Calculator size={16} />
+              <span>Startup Budget Calculator</span>
+            </button>
+
+            <button
+              id="tab-roadmap-btn"
+              type="button"
+              onClick={() => setActiveResultsTab('roadmap')}
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+                activeResultsTab === 'roadmap'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+              }`}
+            >
+              <Calendar size={16} />
+              <span>Milestone Roadmap</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-8">
-        {currentMode.component}
+        {props.analysisMode === 'deep' && activeResultsTab === 'pitchdeck' ? (
+          <PitchDeckCarousel 
+            strategy={props.analysisResult as StrategyResponse} 
+            logoImageUrl={props.logoImageUrl} 
+            onBackToDocument={() => setActiveResultsTab('blueprint')} 
+          />
+        ) : props.analysisMode === 'deep' && activeResultsTab === 'budget' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setActiveResultsTab('blueprint')}
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 rounded-lg border border-gray-800"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Strategy Blueprint</span>
+              </button>
+            </div>
+            <BudgetCalculator
+              initialBudget={props.wizardData?.budget ? parseInt(props.wizardData.budget.replace(/[^0-9]/g, ''), 10) : undefined}
+              initialIndustry={props.wizardData?.industry}
+              businessScope="lean-mvp"
+              companyName={(props.analysisResult as any)?.brandIdentity?.companyNameSuggestions?.[0] || props.wizardData?.businessName}
+            />
+          </div>
+        ) : props.analysisMode === 'deep' && activeResultsTab === 'roadmap' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setActiveResultsTab('blueprint')}
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 rounded-lg border border-gray-800"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Strategy Blueprint</span>
+              </button>
+            </div>
+            <MilestoneTimelineWidget
+              strategy={props.analysisResult as StrategyResponse}
+              businessStage={props.wizardData?.stage || 'Early Stage'}
+              timelineGoal={props.wizardData?.timeline || '3 - 6 Months'}
+            />
+          </div>
+        ) : (
+          currentMode.component
+        )}
       </div>
 
        {/* Hidden, styled content for PDF export */}
@@ -548,9 +761,10 @@ interface DeepDiveProps {
   isLogoLoading: boolean;
   isPrintable?: boolean;
   context?: any;
+  wizardData?: WizardData | null;
 }
 
-const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLogoLoading, isPrintable = false, context }) => {
+const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLogoLoading, isPrintable = false, context, wizardData }) => {
     const { showToast } = useToast();
 
     const handleLinkedInShare = (slide: PitchDeckSlide) => {
@@ -643,17 +857,6 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                 </div>
 
                 <div>
-                    <h4 className="font-bold text-indigo-400 mb-2.5 flex items-center justify-between">
-                        <span>SWOT Analysis (Strategic 2×2 Quadrant)</span>
-                    </h4>
-                    {strategy.marketAnalysis.swot ? (
-                        <SWOTQuadrantGrid swot={strategy.marketAnalysis.swot} isPrintable={isPrintable} />
-                    ) : (
-                        <p className="text-xs text-gray-500 italic">No SWOT analysis data provided.</p>
-                    )}
-                </div>
-
-                <div>
                     <h4 className="font-bold text-indigo-400 mb-2.5">Competitor Landscape</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {strategy.marketAnalysis.competitors.map((c, i) => (
@@ -665,6 +868,28 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                     </div>
                 </div>
             </div>
+        </AccordionSection>
+
+        <AccordionSection 
+            sectionId="swotAnalysis" 
+            icon={<Layers size={20}/>} 
+            title="SWOT Analysis" 
+            defaultOpen={true}
+            isPrintable={isPrintable} 
+            context={context}
+            onCopySection={() => {
+                const s = strategy.marketAnalysis?.swot;
+                if (!s) return;
+                const text = `SWOT Analysis:\nStrengths:\n${s.strengths?.map(i => `• ${i}`).join('\n')}\n\nWeaknesses:\n${s.weaknesses?.map(i => `• ${i}`).join('\n')}\n\nOpportunities:\n${s.opportunities?.map(i => `• ${i}`).join('\n')}\n\nThreats:\n${s.threats?.map(i => `• ${i}`).join('\n')}`;
+                navigator.clipboard.writeText(text);
+                showToast('SWOT analysis copied to clipboard!', 'success', 'copy');
+            }}
+        >
+            <SWOTAnalysisSection 
+                swot={strategy.marketAnalysis?.swot} 
+                strategy={strategy} 
+                isPrintable={isPrintable} 
+            />
         </AccordionSection>
          <AccordionSection 
             sectionId="financialProjections" 
@@ -684,9 +909,25 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                     <FinancialCharts projections={strategy.financialProjections} />
                 )}
 
-                <div>
-                    <h4 className="text-sm font-bold text-gray-300 mb-3">Annual Breakdown & Assumptions</h4>
-                    <div className="space-y-4">
+                <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-gray-300">Annual Breakdown & Assumptions</h4>
+                    {!isPrintable && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const name = strategy.brandIdentity?.companyNameSuggestions?.[0] || 'venture';
+                                exportFinancialProjectionsCsv(strategy.financialProjections, name);
+                                showToast('Financial projections exported', 'success', 'download');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-semibold transition-all shadow-sm"
+                            title="Export financial table as CSV"
+                        >
+                            <Download size={13} className="text-emerald-400" />
+                            <span>Export Financials CSV</span>
+                        </button>
+                    )}
+                </div>
+                <div className="space-y-4">
                         {strategy.financialProjections.map((proj, i) => (
                             <div key={i} className="p-4 bg-gray-900/70 rounded-lg border border-gray-700">
                                 <h4 className="text-lg font-bold text-white mb-2">Year {proj.year}</h4>
@@ -707,9 +948,28 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                             </div>
                         ))}
                     </div>
-                </div>
             </div>
         </AccordionSection>
+
+        {!isPrintable && (
+          <AccordionSection 
+            sectionId="budgetCalculator" 
+            icon={<Calculator size={20}/>} 
+            title="Interactive Startup Budget & Cost Breakdown" 
+            defaultOpen={false} 
+            isPrintable={isPrintable} 
+            context={context}
+          >
+            <div className="pt-2">
+              <BudgetCalculator 
+                initialBudget={wizardData?.budget ? parseInt(wizardData.budget.replace(/[^0-9]/g, ''), 10) : undefined}
+                initialIndustry={wizardData?.industry}
+                businessScope="lean-mvp"
+                companyName={strategy.brandIdentity?.companyNameSuggestions?.[0] || wizardData?.businessName}
+              />
+            </div>
+          </AccordionSection>
+        )}
         
          <AccordionSection sectionId="brandIdentity" icon={<Palette size={20}/>} title="Brand Identity" isPrintable={isPrintable} context={context}>
             <div className="space-y-6">
@@ -880,6 +1140,27 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
             }}
         >
             <div className="space-y-4">
+                {!isPrintable && context?.onOpenPitchDeck && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border border-indigo-500/40 mb-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                        <Sparkles size={15} className="text-indigo-400" />
+                        Interactive Visual Pitch Deck Available
+                      </h4>
+                      <p className="text-xs text-indigo-200/80 mt-0.5">
+                        Present this venture with dynamic slide carousels, full-screen mode, pitch timer, and speaker notes.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={context.onOpenPitchDeck}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-550 text-white text-xs font-bold shadow-lg shadow-indigo-900/30 transition-all shrink-0"
+                    >
+                      <Briefcase size={14} />
+                      <span>Launch Slide Carousel</span>
+                    </button>
+                  </div>
+                )}
                 {strategy.pitchDeck.map((slide: PitchDeckSlide, i: number) => (
                     <div key={i} className="bg-gray-900/70 p-4 rounded-lg border border-gray-700">
                         <div className="flex justify-between items-start mb-2">
@@ -972,6 +1253,16 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {!isPrintable && (
+                <div className="pt-4 border-t border-gray-800">
+                  <MilestoneTimelineWidget 
+                    strategy={strategy}
+                    businessStage={wizardData?.stage || 'Early Stage'}
+                    timelineGoal={wizardData?.timeline || '3 - 6 Months'}
+                  />
                 </div>
               )}
             </div>

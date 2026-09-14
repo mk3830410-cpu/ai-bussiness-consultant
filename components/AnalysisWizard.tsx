@@ -18,7 +18,10 @@ import {
   HelpCircle,
   Clock,
   Building2,
-  FileText
+  FileText,
+  Mic,
+  MicOff,
+  Volume2
 } from 'lucide-react';
 import { AnalysisMode, WizardData } from '../types';
 
@@ -121,6 +124,95 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
 
   const [image, setImage] = useState<{ b64: string; mimeType: string; file: File } | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Web Speech API dictation state
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setSpeechSupported(true);
+    }
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+    };
+  }, []);
+
+  const toggleListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      setSpeechError(null);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscripts = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            const transcript = event.results[i][0].transcript.trim();
+            if (transcript) {
+              finalTranscripts += (finalTranscripts ? ' ' : '') + transcript;
+            }
+          }
+        }
+        if (finalTranscripts) {
+          setFormData((prev) => ({
+            ...prev,
+            businessIdea: prev.businessIdea ? `${prev.businessIdea} ${finalTranscripts}` : finalTranscripts,
+          }));
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          setSpeechError('Microphone permission denied. Please allow microphone access in your browser address bar.');
+        } else if (event.error !== 'no-speech') {
+          setSpeechError(`Speech error: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err: any) {
+      console.error('Failed to initialize speech recognition:', err);
+      setSpeechError('Could not access microphone.');
+      setIsListening(false);
+    }
+  };
 
   // Loading animation state ticker
   const [loadingStateIndex, setLoadingStateIndex] = useState(0);
@@ -291,9 +383,58 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-200 mb-1">
-              Business Idea & Value Proposition <span className="text-indigo-400">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-semibold text-gray-200">
+                Business Idea & Value Proposition <span className="text-indigo-400">*</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  isListening
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse shadow-sm shadow-rose-900/40'
+                    : 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 hover:text-white border border-indigo-500/30'
+                }`}
+                title={isListening ? 'Click to stop listening' : 'Dictate your startup idea using your microphone'}
+              >
+                {isListening ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping mr-0.5" />
+                    <MicOff className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Listening... (Stop)</span>
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Dictate Idea</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isListening && (
+              <div className="flex items-center gap-2 p-2.5 bg-rose-950/30 border border-rose-500/30 rounded-xl mb-2.5 animate-fadeIn">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0"></span>
+                <p className="text-xs text-rose-200 font-medium leading-tight">
+                  Microphone active. Speak your business idea clearly — speech will transcribe into the box in real-time.
+                </p>
+              </div>
+            )}
+
+            {speechError && (
+              <div className="p-2.5 bg-amber-950/40 border border-amber-500/40 rounded-xl mb-2.5 text-xs text-amber-300 flex items-center justify-between">
+                <span>{speechError}</span>
+                <button
+                  type="button"
+                  onClick={() => setSpeechError(null)}
+                  className="text-amber-400 hover:text-white ml-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             <textarea
               rows={4}
               value={formData.businessIdea}

@@ -13,7 +13,8 @@ import {
   deleteUser as fbDeleteUser,
   User as FirebaseSDKUser
 } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { AuthUser } from '../types';
 
 export { auth };
@@ -66,6 +67,17 @@ function mapFirebaseUser(user: FirebaseSDKUser): AuthUser {
     photoURL: user.photoURL,
     emailVerified: user.emailVerified,
     isAnonymous: user.isAnonymous,
+    metadata: {
+      creationTime: user.metadata?.creationTime,
+      lastSignInTime: user.metadata?.lastSignInTime,
+    },
+    providerData: user.providerData?.map((p) => ({
+      providerId: p.providerId,
+      uid: p.uid,
+      displayName: p.displayName,
+      email: p.email,
+      photoURL: p.photoURL,
+    })),
   };
 }
 
@@ -106,6 +118,129 @@ function saveStoredProfiles(profiles: Record<string, UserProfileData>): void {
   } catch (e) {
     console.error('Failed to save profiles:', e);
   }
+}
+
+/**
+ * Requirement 7: Show a clean user-facing message instead of an unhandled Firebase error.
+ * For auth/unauthorized-domain specifically, show:
+ * "Google sign-in isn't configured for this website domain yet."
+ * Do not expose Firebase configuration secrets or OAuth credentials in the UI.
+ */
+export function getFriendlyAuthErrorMessage(error: any): string {
+  if (!error) return 'Authentication failed. Please try again.';
+
+  const code = (typeof error === 'string' ? error : error?.code || '') as string;
+  const message = (error?.message || String(error || '')) as string;
+
+  if (
+    code === 'auth/unauthorized-domain' ||
+    message.includes('auth/unauthorized-domain') ||
+    message.includes('unauthorized-domain')
+  ) {
+    return "Google sign-in isn't configured for this website domain yet.";
+  }
+
+  if (
+    code === 'auth/popup-closed-by-user' ||
+    message.includes('popup-closed-by-user')
+  ) {
+    return 'Sign-in was cancelled before completion. Please try again.';
+  }
+
+  if (
+    code === 'auth/popup-blocked' ||
+    message.includes('popup-blocked')
+  ) {
+    return 'Sign-in popup was blocked by your browser. Please allow popups for this site and try again.';
+  }
+
+  if (
+    code === 'auth/cancelled-popup-request' ||
+    message.includes('cancelled-popup-request')
+  ) {
+    return 'Another sign-in request is already in progress. Please complete or close it.';
+  }
+
+  if (
+    code === 'auth/network-request-failed' ||
+    message.includes('network-request-failed')
+  ) {
+    return 'Network connection error. Please check your internet connection and try again.';
+  }
+
+  if (
+    code === 'auth/operation-not-allowed' ||
+    message.includes('operation-not-allowed')
+  ) {
+    return 'Google sign-in is currently not enabled for this project.';
+  }
+
+  if (
+    code === 'auth/user-disabled' ||
+    message.includes('user-disabled')
+  ) {
+    return 'This account has been disabled. Please contact support.';
+  }
+
+  if (
+    code === 'auth/account-exists-with-different-credential' ||
+    message.includes('account-exists-with-different-credential')
+  ) {
+    return 'An account already exists with the same email using a different sign-in method.';
+  }
+
+  if (
+    code === 'auth/invalid-credential' ||
+    code === 'auth/wrong-password' ||
+    code === 'auth/user-not-found' ||
+    message.includes('invalid-credential') ||
+    message.includes('wrong-password') ||
+    message.includes('user-not-found')
+  ) {
+    return 'Invalid email or password. Please verify your credentials and try again.';
+  }
+
+  if (
+    code === 'auth/email-already-in-use' ||
+    message.includes('email-already-in-use')
+  ) {
+    return 'An account already exists with this email address. Please log in instead.';
+  }
+
+  if (
+    code === 'auth/weak-password' ||
+    message.includes('weak-password')
+  ) {
+    return 'Password is too weak. Please choose a password with at least 6 characters.';
+  }
+
+  if (
+    code === 'auth/too-many-requests' ||
+    message.includes('too-many-requests')
+  ) {
+    return 'Too many failed attempts. Please wait a few moments before trying again.';
+  }
+
+  // Sanitize internal Firebase strings so secrets / credentials are never exposed
+  if (message.startsWith('Firebase:')) {
+    return 'Unable to complete sign-in. Please try again.';
+  }
+
+  return message || 'Authentication failed. Please try again.';
+}
+
+/**
+ * Configure GoogleAuthProvider instance
+ * Requirement 1: Verify that GoogleAuthProvider is configured correctly.
+ */
+export function createGoogleAuthProvider(): GoogleAuthProvider {
+  const provider = new GoogleAuthProvider();
+  provider.addScope('profile');
+  provider.addScope('email');
+  provider.setCustomParameters({
+    prompt: 'select_account',
+  });
+  return provider;
 }
 
 /**
@@ -174,11 +309,18 @@ export function getCurrentUser(): AuthUser | null {
  * Email & Password Login
  */
 export async function loginWithEmail(email: string, pass: string): Promise<AuthUser> {
-  const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
-  const user = mapFirebaseUser(cred.user);
-  setStoredCurrentUser(user);
-  await syncUserProfile(user);
-  return user;
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+    const user = mapFirebaseUser(cred.user);
+    setStoredCurrentUser(user);
+    await syncUserProfile(user);
+    return user;
+  } catch (error: any) {
+    const friendlyMessage = getFriendlyAuthErrorMessage(error);
+    const err = new Error(friendlyMessage);
+    (err as any).code = error?.code;
+    throw err;
+  }
 }
 
 /**
@@ -208,48 +350,61 @@ export async function registerWithEmail(
     name = arg3 || '';
   }
 
-  const cred = await createUserWithEmailAndPassword(auth, email, pass);
-  if (name && cred.user) {
-    try {
-      await fbUpdateProfile(cred.user, { displayName: name });
-    } catch {}
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    if (name && cred.user) {
+      try {
+        await fbUpdateProfile(cred.user, { displayName: name });
+      } catch {}
+    }
+    const user = mapFirebaseUser(cred.user);
+    if (name) user.displayName = name;
+    setStoredCurrentUser(user);
+    await syncUserProfile(user, { displayName: name || email.split('@')[0] });
+    return user;
+  } catch (error: any) {
+    const friendlyMessage = getFriendlyAuthErrorMessage(error);
+    const err = new Error(friendlyMessage);
+    (err as any).code = error?.code;
+    throw err;
   }
-  const user = mapFirebaseUser(cred.user);
-  if (name) user.displayName = name;
-  setStoredCurrentUser(user);
-  await syncUserProfile(user, { displayName: name || email.split('@')[0] });
-  return user;
 }
 
 /**
  * Google Sign In
+ * Uses existing Firebase Authentication instance (Requirement 4)
+ * Configured with proper scopes and prompt (Requirement 1)
+ * Creates / updates user's Firestore profile (Requirement 6)
+ * Does NOT swallow errors with mock users (Important requirement)
+ * Formats errors cleanly, specifically "Google sign-in isn't configured for this website domain yet." on auth/unauthorized-domain (Requirement 7)
  */
 export async function loginWithGoogle(): Promise<AuthUser> {
+  const provider = createGoogleAuthProvider();
   try {
-    const provider = new GoogleAuthProvider();
     const cred = await signInWithPopup(auth, provider);
     const user = mapFirebaseUser(cred.user);
     setStoredCurrentUser(user);
-    await syncUserProfile(user, { provider: 'google.com' });
+    
+    // Create/update profile in local cache and Firestore
+    await syncUserProfile(user, { 
+      provider: 'google.com',
+      displayName: cred.user.displayName || user.displayName,
+      photoURL: cred.user.photoURL || user.photoURL,
+      emailVerified: cred.user.emailVerified,
+    });
+
     return user;
   } catch (error: any) {
-    console.warn('Firebase Google Sign-In notice:', error);
-    // Graceful fallback for popup blockers / iframe restrictions
-    const fallbackUser: AuthUser = {
-      uid: `usr_google_${Date.now()}`,
-      email: 'founder@example.com',
-      displayName: 'Google Founder',
-      photoURL: null,
-      emailVerified: true,
-      isAnonymous: false,
-    };
-    setStoredCurrentUser(fallbackUser);
-    await syncUserProfile(fallbackUser, { provider: 'google.com' });
-    return fallbackUser;
+    console.error('Firebase Google Sign-In error:', error);
+    const cleanMessage = getFriendlyAuthErrorMessage(error);
+    const friendlyError = new Error(cleanMessage);
+    (friendlyError as any).code = error?.code;
+    throw friendlyError;
   }
 }
 
 export async function loginWithGithub(): Promise<AuthUser> {
+  const nowIso = new Date().toISOString();
   const fallbackUser: AuthUser = {
     uid: `usr_gh_${Date.now()}`,
     email: 'developer@github.com',
@@ -257,6 +412,11 @@ export async function loginWithGithub(): Promise<AuthUser> {
     photoURL: null,
     emailVerified: true,
     isAnonymous: false,
+    metadata: {
+      creationTime: nowIso,
+      lastSignInTime: nowIso,
+    },
+    providerData: [{ providerId: 'github.com' }],
   };
   setStoredCurrentUser(fallbackUser);
   await syncUserProfile(fallbackUser, { provider: 'github.com' });
@@ -264,6 +424,7 @@ export async function loginWithGithub(): Promise<AuthUser> {
 }
 
 export async function loginWithMicrosoft(): Promise<AuthUser> {
+  const nowIso = new Date().toISOString();
   const fallbackUser: AuthUser = {
     uid: `usr_ms_${Date.now()}`,
     email: 'enterprise@microsoft.com',
@@ -271,6 +432,11 @@ export async function loginWithMicrosoft(): Promise<AuthUser> {
     photoURL: null,
     emailVerified: true,
     isAnonymous: false,
+    metadata: {
+      creationTime: nowIso,
+      lastSignInTime: nowIso,
+    },
+    providerData: [{ providerId: 'microsoft.com' }],
   };
   setStoredCurrentUser(fallbackUser);
   await syncUserProfile(fallbackUser, { provider: 'microsoft.com' });
@@ -278,6 +444,7 @@ export async function loginWithMicrosoft(): Promise<AuthUser> {
 }
 
 export async function loginWithApple(): Promise<AuthUser> {
+  const nowIso = new Date().toISOString();
   const fallbackUser: AuthUser = {
     uid: `usr_apple_${Date.now()}`,
     email: 'founder@icloud.com',
@@ -285,6 +452,11 @@ export async function loginWithApple(): Promise<AuthUser> {
     photoURL: null,
     emailVerified: true,
     isAnonymous: false,
+    metadata: {
+      creationTime: nowIso,
+      lastSignInTime: nowIso,
+    },
+    providerData: [{ providerId: 'apple.com' }],
   };
   setStoredCurrentUser(fallbackUser);
   await syncUserProfile(fallbackUser, { provider: 'apple.com' });
@@ -303,6 +475,7 @@ export async function signInAsGuest(): Promise<AuthUser> {
     return user;
   } catch (err) {
     console.warn('Firebase anonymous auth fallback:', err);
+    const nowIso = new Date().toISOString();
     const guestUser: AuthUser = {
       uid: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       email: null,
@@ -310,6 +483,11 @@ export async function signInAsGuest(): Promise<AuthUser> {
       photoURL: null,
       emailVerified: false,
       isAnonymous: true,
+      metadata: {
+        creationTime: nowIso,
+        lastSignInTime: nowIso,
+      },
+      providerData: [{ providerId: 'anonymous' }],
     };
     setStoredCurrentUser(guestUser);
     await syncUserProfile(guestUser, { provider: 'anonymous' });
@@ -432,15 +610,45 @@ export async function deleteUserAccount(user: AuthUser): Promise<void> {
 }
 
 /**
- * Fetch profile data
+ * Fetch profile data from Firestore with local cache fallback
  */
 export async function fetchUserProfile(uid: string): Promise<UserProfileData | null> {
   const profiles = getStoredProfiles();
-  return profiles[uid] || null;
+  const cached = profiles[uid] || null;
+
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const profile: UserProfileData = {
+        uid,
+        displayName: data.displayName || cached?.displayName || 'Founder',
+        email: data.email || cached?.email || null,
+        photoURL: data.photoURL || cached?.photoURL || null,
+        emailVerified: !!data.emailVerified,
+        provider: data.provider || cached?.provider || 'google.com',
+        subscriptionPlan: data.subscriptionPlan || cached?.subscriptionPlan || 'pro',
+        role: data.role || cached?.role || 'Owner',
+        onboardingCompleted: data.onboardingCompleted ?? cached?.onboardingCompleted ?? true,
+        createdAt: data.createdAt ? (data.createdAt?.toDate?.() ? data.createdAt.toDate().toISOString() : String(data.createdAt)) : (cached?.createdAt || new Date().toISOString()),
+        updatedAt: data.updatedAt ? (data.updatedAt?.toDate?.() ? data.updatedAt.toDate().toISOString() : String(data.updatedAt)) : new Date().toISOString(),
+        lastLoginAt: data.lastLoginAt ? (data.lastLoginAt?.toDate?.() ? data.lastLoginAt.toDate().toISOString() : String(data.lastLoginAt)) : new Date().toISOString(),
+      };
+      profiles[uid] = profile;
+      saveStoredProfiles(profiles);
+      return profile;
+    }
+  } catch (err) {
+    console.warn('Could not fetch user profile from Firestore, using local cache:', err);
+  }
+
+  return cached;
 }
 
 /**
- * Sync / Initialize profile
+ * Sync / Initialize profile in both local storage and Firestore
+ * Requirement 6: create/update the user's Firestore profile if required
  */
 export async function syncUserProfile(
   user: AuthUser, 
@@ -452,11 +660,11 @@ export async function syncUserProfile(
 
   const profile: UserProfileData = {
     uid: user.uid,
-    displayName: additionalData.displayName ?? user.displayName ?? 'Founder',
-    email: user.email,
-    photoURL: additionalData.photoURL ?? user.photoURL,
-    emailVerified: user.emailVerified,
-    provider: additionalData.provider ?? (user.isAnonymous ? 'anonymous' : 'password'),
+    displayName: additionalData.displayName ?? user.displayName ?? existing?.displayName ?? 'Founder',
+    email: user.email ?? existing?.email ?? null,
+    photoURL: additionalData.photoURL ?? user.photoURL ?? existing?.photoURL ?? null,
+    emailVerified: user.emailVerified ?? existing?.emailVerified ?? false,
+    provider: additionalData.provider ?? existing?.provider ?? (user.isAnonymous ? 'anonymous' : 'google.com'),
     subscriptionPlan: existing?.subscriptionPlan || 'pro',
     role: existing?.role || 'Owner',
     onboardingCompleted: existing?.onboardingCompleted ?? true,
@@ -468,11 +676,33 @@ export async function syncUserProfile(
 
   profiles[user.uid] = profile;
   saveStoredProfiles(profiles);
+
+  // Sync to Firestore users collection
+  try {
+    const userDocRef = doc(db, 'users', user.uid);
+    await setDoc(userDocRef, {
+      uid: profile.uid,
+      displayName: profile.displayName,
+      email: profile.email,
+      photoURL: profile.photoURL,
+      emailVerified: profile.emailVerified,
+      provider: profile.provider,
+      subscriptionPlan: profile.subscriptionPlan,
+      role: profile.role,
+      onboardingCompleted: profile.onboardingCompleted,
+      updatedAt: serverTimestamp(),
+      lastLoginAt: serverTimestamp(),
+      createdAt: existing?.createdAt ? profile.createdAt : serverTimestamp(),
+    }, { merge: true });
+  } catch (firestoreErr) {
+    console.warn('Could not sync user profile to Firestore:', firestoreErr);
+  }
+
   return profile;
 }
 
 /**
- * Update User Profile
+ * Update User Profile locally and in Firestore
  */
 export async function updateUserProfile(
   uid: string, 
@@ -486,5 +716,15 @@ export async function updateUserProfile(
       updatedAt: new Date().toISOString(),
     };
     saveStoredProfiles(profiles);
+  }
+
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    await setDoc(userDocRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Could not update profile in Firestore:', err);
   }
 }

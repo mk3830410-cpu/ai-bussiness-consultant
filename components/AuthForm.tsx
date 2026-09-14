@@ -21,7 +21,8 @@ import {
   loginWithMicrosoft,
   loginWithApple,
   loginAnonymously,
-  sendPasswordReset 
+  sendPasswordReset,
+  getFriendlyAuthErrorMessage
 } from '../services/authService';
 
 interface AuthFormProps {
@@ -99,7 +100,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode: initialMode, onClose, 
         setSuccessNotice('If an account exists with this email, a password reset link has been dispatched to your inbox.');
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication operation failed. Please try again.');
+      setError(getFriendlyAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -113,7 +114,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode: initialMode, onClose, 
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Google sign-in could not be completed.');
+      setError(getFriendlyAuthErrorMessage(err));
     } finally {
       setSocialLoading(null);
     }

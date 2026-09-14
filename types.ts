@@ -8,6 +8,17 @@ export interface AuthUser {
   photoURL: string | null;
   emailVerified: boolean;
   isAnonymous: boolean;
+  metadata?: {
+    creationTime?: string;
+    lastSignInTime?: string;
+  };
+  providerData?: Array<{
+    providerId: string;
+    uid?: string;
+    displayName?: string | null;
+    email?: string | null;
+    photoURL?: string | null;
+  }>;
 }
 
 export type SubscriptionTier = 'free' | 'pro' | 'enterprise' | null;
@@ -241,11 +252,16 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export type BusinessIdeaStatus = 'new' | 'exploring' | 'validated' | 'archived';
+
 export interface BusinessIdeaItem {
   id: string;
+  userId?: string;
   title: string;
   description: string;
   industry: string;
   tags: string[];
   createdAt: number;
+  updatedAt?: number;
+  status?: BusinessIdeaStatus;
 }

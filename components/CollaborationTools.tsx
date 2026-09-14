@@ -123,15 +123,15 @@ export const TeamModal: React.FC<TeamModalProps> = ({ members, onInvite, isOpen,
             {members.length === 0 ? (
               <p className="text-gray-500 text-sm italic">You haven't invited anyone yet.</p>
             ) : (
-              members.map(member => (
+              members.filter(Boolean).map(member => (
                 <div key={member.id} className="flex items-center justify-between bg-gray-700/30 p-3 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-indigo-900 flex items-center justify-center text-indigo-300 font-bold text-xs">
-                      {member.email.charAt(0).toUpperCase()}
+                      {(member.email || '?').charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <div className="text-sm text-white font-medium">{member.email}</div>
-                      <div className="text-xs text-gray-400 capitalize">{member.role} • {member.status}</div>
+                      <div className="text-xs text-gray-400 capitalize">{member.role} • {member.status || 'pending'}</div>
                     </div>
                   </div>
                 </div>
