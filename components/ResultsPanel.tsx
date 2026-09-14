@@ -18,6 +18,7 @@ import { BusinessScoreCard } from './BusinessScoreCard';
 import { PitchDeckCarousel } from './PitchDeckCarousel';
 import { BudgetCalculator } from './BudgetCalculator';
 import { MilestoneTimelineWidget } from './MilestoneTimelineWidget';
+import { CompetitorBubbleChart } from './CompetitorBubbleChart';
 import { WizardData } from '../types';
 import { ShieldAlert, ListOrdered, Coins, Users2, Printer, Layers, Compass, FileCode, Calculator, Calendar, ArrowLeft } from 'lucide-react';
 
@@ -856,8 +857,18 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
                     </div>
                 </div>
 
+                {/* Interactive D3.js Competitor Bubble Chart */}
+                <div className="pt-2">
+                    <CompetitorBubbleChart 
+                        competitors={strategy.marketAnalysis.competitors}
+                        startupName={strategy.brandIdentity?.companyNameSuggestions?.[0] || 'Your Venture'}
+                        startupUsp={strategy.marketAnalysis.uniqueSellingProposition || strategy.uniqueValueProposition}
+                        industry="SaaS"
+                    />
+                </div>
+
                 <div>
-                    <h4 className="font-bold text-indigo-400 mb-2.5">Competitor Landscape</h4>
+                    <h4 className="font-bold text-indigo-400 mb-2.5">Competitor Detailed Profiles</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {strategy.marketAnalysis.competitors.map((c, i) => (
                             <div key={i} className="p-3.5 bg-gray-900/80 rounded-xl border border-gray-800 hover:border-gray-700 transition-colors">

@@ -138,11 +138,11 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
                 setCompareInitialB(strategies[1]?.id);
                 setComparing(true);
               }}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-indigo-300 hover:text-white border border-slate-700 hover:border-indigo-500/50 font-semibold rounded-xl text-sm transition-all duration-200 shadow-sm flex items-center gap-2 shrink-0"
-              title="Compare two strategies side-by-side"
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-indigo-300 hover:text-white border border-slate-700 hover:border-indigo-500/50 font-semibold rounded-xl text-sm transition-all duration-200 shadow-sm flex items-center gap-2 shrink-0 cursor-pointer"
+              title="Compare two strategies side-by-side in split screen"
             >
               <ArrowLeftRight className="w-4 h-4 text-indigo-400" />
-              <span>Compare Strategies</span>
+              <span>Split-Screen Compare</span>
             </button>
           )}
 

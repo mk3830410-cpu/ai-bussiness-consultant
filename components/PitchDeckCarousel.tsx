@@ -22,10 +22,21 @@ import {
   Zap,
   Briefcase,
   Video,
-  Download
+  Download,
+  Presentation,
+  Image as ImageIcon,
+  RefreshCw,
+  SlidersHorizontal
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { VeoVideoGeneratorModal } from './VeoVideoGeneratorModal';
+import { GoogleSlidesExportModal } from './GoogleSlidesExportModal';
+import { 
+  generateSlideBackground, 
+  generateAllSlideBackgrounds, 
+  SlideVisual 
+} from '../services/slideVisualsService';
+import { SlideData } from '../services/slidesExportService';
 
 interface PitchDeckCarouselProps {
   strategy: StrategyResponse;
@@ -62,6 +73,16 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [showVeoModal, setShowVeoModal] = useState(false);
   const [customSlides, setCustomSlides] = useState<EnrichedSlide[]>([]);
+
+  // Automated AI Background Visuals State
+  const [slideVisuals, setSlideVisuals] = useState<Record<number, SlideVisual>>({});
+  const [isGeneratingVisuals, setIsGeneratingVisuals] = useState(false);
+  const [visualProgress, setVisualProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [showVisualBackgrounds, setShowVisualBackgrounds] = useState(true);
+  const [visualOpacity, setVisualOpacity] = useState<number>(45);
+
+  // Google Slides Export Modal State
+  const [showGoogleSlidesModal, setShowGoogleSlidesModal] = useState(false);
 
   // Presentation Timer
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -301,6 +322,62 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
     setCurrentSlideIndex(slides.length);
   };
 
+  // Auto-generate AI background visuals for all slides
+  const handleAutoGenerateVisuals = async () => {
+    const companyName = strategy.brandIdentity?.companyNameSuggestions?.[0] || 'Venture Concept';
+    const industry = 'SaaS';
+    setIsGeneratingVisuals(true);
+    setVisualProgress({ completed: 0, total: slides.length });
+    showToast('Synthesizing bespoke AI background visuals for all pitch deck slides...', 'info');
+
+    try {
+      const generatedMap = await generateAllSlideBackgrounds(
+        slides.length,
+        companyName,
+        industry,
+        (completed, total) => {
+          setVisualProgress({ completed, total });
+        }
+      );
+      setSlideVisuals(generatedMap);
+      setShowVisualBackgrounds(true);
+      showToast(`Generated AI background visuals for all ${slides.length} slides!`, 'success');
+    } catch (e) {
+      showToast('Failed to generate slide visuals.', 'error');
+    } finally {
+      setIsGeneratingVisuals(false);
+      setVisualProgress(null);
+    }
+  };
+
+  // Pre-populate high-resolution visuals on load if empty
+  useEffect(() => {
+    if (Object.keys(slideVisuals).length === 0 && slides.length > 0) {
+      const companyName = strategy.brandIdentity?.companyNameSuggestions?.[0] || 'Venture Concept';
+      const initialMap: Record<number, SlideVisual> = {};
+      const colors = ['#6366f1', '#f43f5e', '#10b981', '#0284c7', '#8b5cf6', '#059669', '#ec4899'];
+      slides.forEach((_, idx) => {
+        const slideId = idx + 1;
+        const accent = colors[idx % colors.length];
+        initialMap[slideId] = generateSlideBackground(slideId, `Slide ${slideId}`, companyName, 'SaaS', accent);
+      });
+      setSlideVisuals(initialMap);
+    }
+  }, [slides, strategy, slideVisuals]);
+
+  // Convert enriched slides into SlideData format for Google Slides export
+  const exportableSlides: SlideData[] = useMemo(() => {
+    return slides.map((s) => ({
+      id: s.id,
+      title: s.title,
+      subtitle: s.subtitle,
+      points: s.points,
+      speakerNotes: s.speakerNotes,
+      badge: s.badge,
+      accentColor: s.accentColor,
+    }));
+  }, [slides]);
+
   const currentSlide = slides[currentSlideIndex] || slides[0];
 
   const handleNext = useCallback(() => {
@@ -386,6 +463,35 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
             </button>
           </div>
 
+          {/* Automated AI Slide Visuals Workflow */}
+          <button
+            onClick={handleAutoGenerateVisuals}
+            disabled={isGeneratingVisuals}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600/25 hover:bg-indigo-600/35 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            title="Automatically synthesize AI background visuals for every slide"
+          >
+            {isGeneratingVisuals ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-300" />
+            ) : (
+              <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
+            )}
+            <span>
+              {isGeneratingVisuals
+                ? `Generating Visuals (${visualProgress?.completed}/${visualProgress?.total})...`
+                : 'Auto-Generate Visuals'}
+            </span>
+          </button>
+
+          {/* Export to Google Slides */}
+          <button
+            onClick={() => setShowGoogleSlidesModal(true)}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Export pitch deck slides directly to Google Slides"
+          >
+            <Presentation className="w-3.5 h-3.5 text-amber-400" />
+            <span>Google Slides</span>
+          </button>
+
           {/* Create AI Video Pitch with Google Veo */}
           <button
             onClick={() => setShowVeoModal(true)}
@@ -393,7 +499,7 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
             title="Generate a cinematic pitch video summarizing the concept using Google Veo"
           >
             <Video className="w-3.5 h-3.5 text-purple-200" />
-            <span>Generate Pitch Video (Veo)</span>
+            <span>Pitch Video (Veo)</span>
           </button>
 
           {/* Toggle Speaker Notes */}
@@ -412,7 +518,7 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
           {/* Copy Slide */}
           <button
             onClick={handleCopySlide}
-            className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl border border-gray-700 transition-colors"
+            className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl border border-gray-700 transition-colors cursor-pointer"
             title="Copy this slide to clipboard"
           >
             {copiedIndex === currentSlideIndex ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
@@ -421,7 +527,7 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
           {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl border border-gray-700 transition-colors"
+            className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl border border-gray-700 transition-colors cursor-pointer"
             title={isFullscreen ? 'Exit Fullscreen' : 'Present in Fullscreen'}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -429,12 +535,46 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
         </div>
       </div>
 
+      {/* Visual Background Settings Bar */}
+      {showVisualBackgrounds && (slideVisuals[currentSlide.id] || slideVisuals[currentSlideIndex + 1]) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-slate-900/60 border border-slate-800/80 rounded-xl text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-slate-300 font-medium">
+              AI Visual Motif: <strong>{(slideVisuals[currentSlide.id] || slideVisuals[currentSlideIndex + 1])?.conceptLabel}</strong>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400">Visual Opacity:</span>
+              <input
+                type="range"
+                min="15"
+                max="80"
+                value={visualOpacity}
+                onChange={(e) => setVisualOpacity(Number(e.target.value))}
+                className="w-24 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              />
+              <span className="text-[10px] font-mono text-slate-300">{visualOpacity}%</span>
+            </div>
+
+            <button
+              onClick={() => setShowVisualBackgrounds(!showVisualBackgrounds)}
+              className="text-[11px] text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+            >
+              Hide Visual
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Slide Stage */}
       <div className="relative group">
         {/* Previous Button */}
         <button
           onClick={handlePrev}
-          className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-gray-900/90 border border-gray-700 text-gray-300 hover:text-white hover:bg-indigo-600 hover:border-indigo-500 shadow-2xl flex items-center justify-center transition-all duration-200"
+          className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-gray-900/90 border border-gray-700 text-gray-300 hover:text-white hover:bg-indigo-600 hover:border-indigo-500 shadow-2xl flex items-center justify-center transition-all duration-200 cursor-pointer"
           title="Previous slide (Left Arrow)"
         >
           <ChevronLeft className="w-6 h-6" />
@@ -444,6 +584,21 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
         <div
           className={`w-full min-h-[440px] md:min-h-[500px] rounded-3xl p-8 md:p-12 shadow-2xl border border-gray-800 bg-gradient-to-br ${currentSlide.bgGradient} flex flex-col justify-between relative overflow-hidden transition-all duration-300`}
         >
+          {/* Automated AI Bespoke Visual Background Layer */}
+          {showVisualBackgrounds && (slideVisuals[currentSlide.id] || slideVisuals[currentSlideIndex + 1]) && (
+            <div 
+              className="absolute inset-0 pointer-events-none bg-cover bg-center transition-opacity duration-700"
+              style={{
+                backgroundImage: `url(${(slideVisuals[currentSlide.id] || slideVisuals[currentSlideIndex + 1])?.imageUrl})`,
+                opacity: visualOpacity / 100,
+                mixBlendMode: 'screen',
+              }}
+            />
+          )}
+
+          {/* High-contrast legibility backdrop shield */}
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent pointer-events-none" />
+
           {/* Subtle watermark / background grid accent */}
           <div 
             className="absolute -top-24 -right-24 w-96 h-96 rounded-full blur-3xl opacity-20 pointer-events-none"
@@ -626,6 +781,14 @@ export const PitchDeckCarousel: React.FC<PitchDeckCarouselProps> = ({
         onClose={() => setShowVeoModal(false)}
         strategy={strategy}
         onVideoAppended={handleVideoAppended}
+      />
+
+      {/* Google Slides Presentation Export Modal */}
+      <GoogleSlidesExportModal
+        isOpen={showGoogleSlidesModal}
+        onClose={() => setShowGoogleSlidesModal(false)}
+        companyName={strategy.brandIdentity?.companyNameSuggestions?.[0] || 'Venture Concept'}
+        slides={exportableSlides}
       />
     </div>
   );
