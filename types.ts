@@ -21,7 +21,18 @@ export interface AuthUser {
   }>;
 }
 
-export type SubscriptionTier = 'free' | 'pro' | 'enterprise' | null;
+export type SubscriptionTier = 'free' | 'starter' | 'pro' | 'enterprise' | null;
+
+export interface UserSubscription {
+  plan: 'free' | 'starter' | 'pro' | 'enterprise';
+  status: 'active' | 'pending' | 'halted' | 'cancelled' | 'completed' | 'inactive';
+  razorpaySubscriptionId?: string;
+  razorpayPlanId?: string;
+  razorpayPaymentId?: string;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  updatedAt?: any;
+}
 
 export interface TeamMember {
   id: string;

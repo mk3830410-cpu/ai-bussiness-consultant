@@ -58,7 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
   displayName,
   isVerified,
 }) => {
-  const { user, authLoading, logout, isEmailVerified } = useAuth();
+  const { user, authLoading, logout, isEmailVerified, isPro } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -341,6 +341,11 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="hidden md:inline text-xs font-semibold text-slate-200 max-w-[100px] truncate">
                     {effectiveName || 'Founder'}
                   </span>
+                  {isPro && (
+                    <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-extrabold text-[9px] tracking-wider uppercase shadow-sm shadow-indigo-500/30">
+                      PRO
+                    </span>
+                  )}
                   <ChevronDown className="hidden md:inline w-3 h-3 text-slate-400" />
                 </button>
 

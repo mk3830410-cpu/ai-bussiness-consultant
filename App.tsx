@@ -51,6 +51,11 @@ import {
 } from './services/strategyStorage';
 import { exportStrategyToPdf } from './services/pdfExportService';
 import { validateEnvironment } from './services/envValidation';
+import { 
+  loadRazorpayCheckoutScript, 
+  createProSubscription, 
+  verifySubscriptionPayment 
+} from './services/subscriptionService';
 
 const AppContent: React.FC = () => {
   const { showToast } = useToast();
@@ -63,13 +68,17 @@ const AppContent: React.FC = () => {
   const { 
     user, 
     userProfile, 
+    subscription,
+    isPro,
     authLoading,
     isAuthenticated, 
     isEmailVerified, 
     isAnonymous, 
     isOnline, 
     refreshProfile, 
-    refreshVerification 
+    refreshVerification,
+    refreshSubscription,
+    logout
   } = useAuth();
 
   // Route mapping helpers
@@ -206,7 +215,12 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handleLogoutSuccess = () => {
+  const handleLogoutSuccess = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.warn('Logout error:', err);
+    }
     setIntendedDestination(null);
     setAuthModalMode(null);
     setCurrentTab('dashboard');
@@ -313,15 +327,113 @@ const AppContent: React.FC = () => {
   // Derived real dashboard stats from active strategies & ideas
   const overviewStats = getDashboardStats(user?.uid, savedStrategies, savedIdeas);
 
-  const handleUpdatePlan = async (tier: SubscriptionTier) => {
-    if (!user) return;
+  const [isProcessingPro, setIsProcessingPro] = useState(false);
+
+  // Check URL query on return for ?payment=success (Requirement 33)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success') {
+      showToast('Verifying your Founder Pro subscription...', 'info');
+      refreshSubscription().then(() => {
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState(null, '', cleanUrl);
+      }).catch(() => {});
+    }
+  }, [refreshSubscription, showToast]);
+
+  const handleGetProSubscription = async () => {
+    if (!user) {
+      setIntendedDestination('/pricing');
+      setAuthModalMode('login');
+      if (window.location.pathname !== '/login') {
+        window.history.pushState(null, '', '/login');
+      }
+      return;
+    }
+
+    if (subscription?.plan === 'pro' && subscription?.status === 'active') {
+      showToast('You are already actively subscribed to Founder Pro!', 'info');
+      return;
+    }
+
+    setIsProcessingPro(true);
     try {
-      await updateUserProfile(user.uid, { subscriptionPlan: tier });
-      await refreshProfile();
-      showToast(`Subscribed to ${tier.toUpperCase()} plan successfully!`, 'success');
-      setCurrentTab('dashboard');
+      // 1. Ensure Razorpay script is dynamically loaded
+      const isScriptLoaded = await loadRazorpayCheckoutScript();
+      if (!isScriptLoaded) {
+        throw new Error('Could not load Razorpay payment SDK. Please check your internet connection and try again.');
+      }
+
+      // 2. Call backend /api/razorpay/create-subscription
+      const createRes = await createProSubscription();
+      if (!createRes.success) {
+        if (createRes.code === 'ALREADY_SUBSCRIBED') {
+          showToast('You already have an active Pro subscription.', 'info');
+          await refreshSubscription();
+          return;
+        }
+        throw new Error(createRes.message || 'Failed to initiate Founder Pro subscription.');
+      }
+
+      const subscriptionId = createRes.subscriptionId;
+      const keyId = createRes.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
+
+      if (!subscriptionId || !keyId) {
+        throw new Error('Missing subscription credentials from server. Please configure backend credentials.');
+      }
+
+      // 3. Open Razorpay Checkout modal
+      const options = {
+        key: keyId,
+        subscription_id: subscriptionId,
+        name: 'StratIQ',
+        description: 'Founder Pro Subscription ($29/mo)',
+        handler: async function (response: any) {
+          setIsProcessingPro(true);
+          try {
+            // 4. Verification call to backend
+            const verifyRes = await verifySubscriptionPayment({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+
+            if (verifyRes.success) {
+              await refreshSubscription();
+              await refreshProfile();
+              showToast('Founder Pro subscription activated successfully! Welcome to Pro.', 'success');
+              setCurrentTab('dashboard');
+            } else {
+              showToast(verifyRes.message || 'Payment verification failed. Please contact support.', 'error');
+            }
+          } catch (verifyErr: any) {
+            showToast('Error verifying payment: ' + (verifyErr.message || 'Unknown error'), 'error');
+          } finally {
+            setIsProcessingPro(false);
+          }
+        },
+        prefill: {
+          name: userProfile?.displayName || user.displayName || '',
+          email: user.email || '',
+        },
+        theme: {
+          color: '#4f46e5',
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessingPro(false);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (err: any) {
-      showToast('Could not update plan: ' + err.message, 'error');
+      console.error('[StratIQ] Subscription error:', err);
+      showToast(err.message || 'Could not initiate subscription. Please try again.', 'error');
+    } finally {
+      setIsProcessingPro(false);
     }
   };
 
@@ -651,7 +763,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  const currentPlan = userProfile?.subscriptionPlan || 'free';
+  const currentPlan: SubscriptionTier = isPro ? 'pro' : (userProfile?.subscriptionPlan === 'enterprise' ? 'enterprise' : 'free');
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between">
@@ -715,10 +827,12 @@ const AppContent: React.FC = () => {
             <DashboardOverview 
               stats={overviewStats}
               recentStrategies={savedStrategies}
+              subscription={subscription}
               onStartNewAnalysis={() => setCurrentTab('new_analysis')}
               onOpenAdvisor={() => setCurrentTab('advisor')}
               onOpenStrategy={handleOpenStrategy}
               onViewAllStrategies={() => setCurrentTab('saved_strategies')}
+              onUpgradePro={() => setCurrentTab('pricing')}
             />
           )}
 
@@ -838,7 +952,12 @@ const AppContent: React.FC = () => {
                   Current plan: <strong className="text-indigo-400 uppercase">{currentPlan}</strong>
                 </p>
               </div>
-              <PricingPage onSelectPlan={handleUpdatePlan} />
+              <PricingPage 
+                onSelectPlan={() => handleGetProSubscription()} 
+                subscription={subscription}
+                isProcessing={isProcessingPro}
+                onGetPro={handleGetProSubscription}
+              />
             </div>
           )}
 

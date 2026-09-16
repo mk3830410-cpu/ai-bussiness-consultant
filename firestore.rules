@@ -13,7 +13,17 @@ service cloud.firestore {
     // User profile document
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      
+      // Client-side users cannot write or tamper with subscription fields.
+      // Privileged subscription updates are executed exclusively by the trusted backend Firebase Admin SDK.
+      allow create: if isOwner(userId) && 
+        (!('subscription' in request.resource.data)) &&
+        (!('subscriptionPlan' in request.resource.data) || request.resource.data.subscriptionPlan in ['free', 'starter']);
+        
+      allow update: if isOwner(userId) && 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['subscription', 'subscriptionPlan']));
+      
+      allow delete: if isOwner(userId);
 
       // User strategies subcollection
       match /strategies/{strategyId} {
@@ -41,6 +51,11 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+    }
+
+    // Backend Webhook Events collection (accessed only via Firebase Admin SDK)
+    match /webhookEvents/{eventId} {
+      allow read, write: if false;
     }
   }
 }

@@ -10,10 +10,14 @@ import {
   reloadUserVerification, 
   logoutUser 
 } from './authService';
+import { UserSubscription } from '../types';
+import { fetchCurrentSubscription, subscribeToUserSubscription } from './subscriptionService';
 
 interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: UserProfileData | null;
+  subscription: UserSubscription;
+  isPro: boolean;
   authLoading: boolean;
   loading: boolean;
   isAuthenticated: boolean;
@@ -22,6 +26,7 @@ interface AuthContextType {
   isOnline: boolean;
   refreshProfile: () => Promise<void>;
   refreshVerification: () => Promise<boolean>;
+  refreshSubscription: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -30,6 +35,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
+  const [subscription, setSubscription] = useState<UserSubscription>({
+    plan: 'starter',
+    status: 'inactive'
+  });
   const [authLoading, setAuthLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -64,22 +73,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     setAuthLoading(true);
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeSubListener: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         await loadProfile(currentUser);
+        // Real-time listener for user subscription from Firestore
+        if (unsubscribeSubListener) unsubscribeSubListener();
+        unsubscribeSubListener = subscribeToUserSubscription(currentUser.uid, (sub) => {
+          setSubscription(sub);
+        });
+        // Initial fetch from backend API
+        fetchCurrentSubscription().then((sub) => {
+          if (sub) setSubscription(sub);
+        }).catch(() => {});
       } else {
         setUserProfile(null);
+        setSubscription({ plan: 'starter', status: 'inactive' });
+        if (unsubscribeSubListener) {
+          unsubscribeSubListener();
+          unsubscribeSubListener = null;
+        }
       }
       setAuthLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSubListener) unsubscribeSubListener();
+    };
   }, [loadProfile]);
 
   const refreshProfile = async () => {
     if (user) {
       await loadProfile(user);
+    }
+  };
+
+  const refreshSubscription = async () => {
+    if (user) {
+      const sub = await fetchCurrentSubscription();
+      if (sub) setSubscription(sub);
     }
   };
 
@@ -96,13 +131,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await logoutUser();
     setUser(null);
     setUserProfile(null);
+    setSubscription({ plan: 'starter', status: 'inactive' });
   };
+
+  // True only when subscription.plan === "pro" AND subscription.status === "active"
+  const isPro = (subscription.plan === 'pro' || subscription.plan === 'enterprise') && subscription.status === 'active';
 
   return (
     <AuthContext.Provider
       value={{
         user,
         userProfile,
+        subscription,
+        isPro,
         authLoading,
         loading: authLoading,
         isAuthenticated: !!user && !authLoading,
@@ -111,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOnline,
         refreshProfile,
         refreshVerification,
+        refreshSubscription,
         logout,
       }}
     >

@@ -12,9 +12,12 @@ import {
   Compass,
   CheckCircle2,
   Zap,
-  BarChart3
+  BarChart3,
+  ShieldCheck,
+  Clock,
+  ExternalLink
 } from 'lucide-react';
-import { SavedStrategy } from '../types';
+import { SavedStrategy, UserSubscription } from '../types';
 
 interface DashboardOverviewProps {
   stats: {
@@ -24,20 +27,27 @@ interface DashboardOverviewProps {
     averageScore: number;
   };
   recentStrategies: SavedStrategy[];
+  subscription?: UserSubscription;
   onStartNewAnalysis: () => void;
   onOpenAdvisor: () => void;
   onOpenStrategy: (strategy: SavedStrategy) => void;
   onViewAllStrategies: () => void;
+  onUpgradePro?: () => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   stats,
   recentStrategies,
+  subscription,
   onStartNewAnalysis,
   onOpenAdvisor,
   onOpenStrategy,
   onViewAllStrategies,
+  onUpgradePro,
 }) => {
+  const isProActive = subscription?.plan === 'pro' && subscription?.status === 'active';
+  const isPending = subscription?.plan === 'pro' && subscription?.status === 'pending';
+
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Welcome Banner */}
@@ -77,6 +87,69 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <span>Chat with AI Co-Founder</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Dashboard Subscription State Card (Requirement 23) */}
+      <div className="bg-gray-800/80 border border-gray-700/80 rounded-2xl p-5 md:p-6 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
+            isProActive 
+              ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400' 
+              : isPending 
+              ? 'bg-amber-500/20 border border-amber-500/30 text-amber-400' 
+              : 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-400'
+          }`}>
+            {isProActive ? <ShieldCheck className="w-6 h-6" /> : isPending ? <Clock className="w-6 h-6 animate-pulse" /> : <Zap className="w-6 h-6" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="text-base font-bold text-white">
+                {isProActive ? 'Founder Pro' : isPending ? 'Founder Pro' : 'Starter'}
+              </h4>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                isProActive 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  : isPending 
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                  : 'bg-slate-700 text-slate-300'
+              }`}>
+                {isProActive ? 'Active' : isPending ? 'Payment Confirmation Pending' : 'Free Plan'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {isProActive 
+                ? 'Unlimited AI strategies, financial projections, 24/7 AI Advisor, and export tools enabled.'
+                : isPending 
+                ? 'Payment confirmation pending. Verifying subscription status with Razorpay...'
+                : '3 Quick Brainstorms included. Upgrade to unlock full SWOT, financial models, and exports.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          {isProActive ? (
+            <button
+              onClick={onUpgradePro}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5"
+            >
+              <span>Manage Subscription</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          ) : isPending ? (
+            <span className="text-xs text-amber-400 font-semibold flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 animate-spin" />
+              <span>Payment confirmation pending</span>
+            </span>
+          ) : (
+            <button
+              onClick={onUpgradePro}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-500/20 flex items-center gap-2 transform hover:scale-105"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span>Upgrade to Founder Pro</span>
+            </button>
+          )}
         </div>
       </div>
 
