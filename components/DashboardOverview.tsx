@@ -18,6 +18,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { SavedStrategy, UserSubscription } from '../types';
+import { UserUsage } from '../subscriptionConfig';
 
 interface DashboardOverviewProps {
   stats: {
@@ -28,6 +29,7 @@ interface DashboardOverviewProps {
   };
   recentStrategies: SavedStrategy[];
   subscription?: UserSubscription;
+  usage?: UserUsage | null;
   onStartNewAnalysis: () => void;
   onOpenAdvisor: () => void;
   onOpenStrategy: (strategy: SavedStrategy) => void;
@@ -39,6 +41,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   stats,
   recentStrategies,
   subscription,
+  usage,
   onStartNewAnalysis,
   onOpenAdvisor,
   onOpenStrategy,
@@ -48,6 +51,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const isEnterpriseActive = subscription?.plan === 'enterprise' && subscription?.status === 'active';
   const isProActive = subscription?.plan === 'pro' && subscription?.status === 'active';
   const isPending = (subscription?.plan === 'pro' || subscription?.plan === 'enterprise') && subscription?.status === 'pending';
+  const analysesCount = usage?.analysesCount || 0;
+  const isStarterLimitReached = (!isProActive && !isEnterpriseActive) && analysesCount >= 3;
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -127,8 +132,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
                   : 'bg-slate-700 text-slate-300'
               }`}>
-                {isEnterpriseActive ? 'Active (Team Scale)' : isProActive ? 'Active (Founder Pro)' : isPending ? 'Payment Confirmation Pending' : 'Free Plan'}
+                {isEnterpriseActive ? 'Active (Team Scale)' : isProActive ? 'Active (Founder Pro)' : isPending ? 'Payment Confirmation Pending' : 'Starter Plan'}
               </span>
+              {!isProActive && !isEnterpriseActive && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  isStarterLimitReached 
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                    : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                }`}>
+                  {analysesCount}/3 Used
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 mt-1">
               {isEnterpriseActive
@@ -137,7 +151,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 ? 'Unlimited AI strategies, financial projections, 24/7 AI Advisor, and export tools enabled.'
                 : isPending 
                 ? 'Payment confirmation pending. Verifying subscription status with Razorpay...'
-                : '3 Quick Brainstorms included. Upgrade to unlock full SWOT, financial models, and exports.'}
+                : isStarterLimitReached
+                ? 'You have reached your 3 monthly Quick Brainstorms limit. Upgrade to Founder Pro for unlimited Deep Dive strategies, financial models, and exports.'
+                : `${analysesCount} of 3 Quick Brainstorms used this month. Upgrade to Founder Pro for unlimited Deep Dive strategies, 3-year financials, and PDF/CSV export.`}
             </p>
           </div>
         </div>
@@ -159,10 +175,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           ) : (
             <button
               onClick={onUpgradePro}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-500/20 flex items-center gap-2 transform hover:scale-105"
+              className={`px-5 py-2.5 font-extrabold rounded-xl text-xs transition-all shadow-md flex items-center gap-2 transform hover:scale-105 ${
+                isStarterLimitReached
+                  ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-amber-500/20'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20'
+              }`}
             >
               <Zap className="w-3.5 h-3.5 text-amber-300" />
-              <span>Upgrade Plan</span>
+              <span>{isStarterLimitReached ? 'Upgrade to Founder Pro' : 'Upgrade Plan'}</span>
             </button>
           )}
         </div>

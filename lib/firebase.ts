@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
 import localConfig from '../firebase-applet-config.json';
 
 // Canonical Firebase project auth domain: ai-bussiness-consultant-9e923.firebaseapp.com
@@ -31,4 +31,17 @@ const firebaseConfig = {
 
 export const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth: Auth = getAuth(app);
-export const db: Firestore = getFirestore(app, localConfig.firestoreDatabaseId || '(default)');
+
+const databaseId = localConfig.firestoreDatabaseId || '(default)';
+
+let firestoreDb: Firestore;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    ignoreUndefinedProperties: true,
+  }, databaseId);
+} catch {
+  firestoreDb = getFirestore(app, databaseId);
+}
+
+export const db: Firestore = firestoreDb;

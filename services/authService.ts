@@ -13,14 +13,23 @@ import {
   deleteUser as fbDeleteUser,
   User as FirebaseSDKUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { AuthUser } from '../types';
+import { SUPPORT_EMAIL } from '../supportConfig';
 
 export { auth };
 
 export async function testConnection(): Promise<boolean> {
-  return true;
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes('the client is offline') || (error as any).code === 'unavailable')) {
+      console.warn('[StratIQ] Firestore backend operates in offline-resilient mode.');
+    }
+    return false;
+  }
 }
 
 export type { AuthUser };
@@ -176,10 +185,17 @@ export function getFriendlyAuthErrorMessage(error: any): string {
   }
 
   if (
+    code === 'auth/invalid-email' ||
+    message.includes('invalid-email')
+  ) {
+    return 'Please enter a valid email address.';
+  }
+
+  if (
     code === 'auth/user-disabled' ||
     message.includes('user-disabled')
   ) {
-    return 'This account has been disabled. Please contact support.';
+    return `This account has been disabled. Please contact support at ${SUPPORT_EMAIL}.`;
   }
 
   if (
@@ -221,8 +237,8 @@ export function getFriendlyAuthErrorMessage(error: any): string {
     return 'Too many failed attempts. Please wait a few moments before trying again.';
   }
 
-  // Sanitize internal Firebase strings so secrets / credentials are never exposed
-  if (message.startsWith('Firebase:')) {
+  // Sanitize internal Firebase strings and code prefixes so raw codes are never exposed
+  if (message.startsWith('Firebase:') || message.includes('auth/')) {
     return 'Unable to complete sign-in. Please try again.';
   }
 

@@ -5,14 +5,14 @@ export type ToastType = 'success' | 'info' | 'warning' | 'error';
 
 export interface ToastItem {
   id: string;
-  message: string;
+  message: ReactNode;
   type: ToastType;
   icon?: 'copy' | 'download' | 'check' | 'default';
   duration?: number;
 }
 
 interface ToastContextType {
-  showToast: (message: string, type?: ToastType, icon?: 'copy' | 'download' | 'check' | 'default', duration?: number) => void;
+  showToast: (message: ReactNode, type?: ToastType, icon?: 'copy' | 'download' | 'check' | 'default', duration?: number) => void;
   removeToast: (id: string) => void;
 }
 
@@ -104,7 +104,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   </div>
                 )}
               </div>
-              <p className="text-sm font-medium text-gray-200 leading-snug">{toast.message}</p>
+              <div className="text-sm font-medium text-gray-200 leading-snug">{toast.message}</div>
             </div>
             <button
               onClick={() => removeToast(toast.id)}

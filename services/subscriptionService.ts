@@ -21,8 +21,8 @@ export function getBackendApiUrl(): string {
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
     return 'http://localhost:10000';
   }
-  // Production fallback if VITE_API_URL is missing
-  return '';
+  // Fallback to deployed Render backend service if VITE_API_URL is unset
+  return 'https://ai-bussiness-consultant.onrender.com';
 }
 
 /**

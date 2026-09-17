@@ -24,6 +24,7 @@ import {
   sendPasswordReset,
   getFriendlyAuthErrorMessage
 } from '../services/authService';
+import { SUPPORT_EMAIL, createSupportMailto } from '../supportConfig';
 
 interface AuthFormProps {
   mode: 'login' | 'signup' | 'forgot';
@@ -131,7 +132,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode: initialMode, onClose, 
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || `${provider} sign-in failed.`);
+      setError(getFriendlyAuthErrorMessage(err));
     } finally {
       setSocialLoading(null);
     }
@@ -145,7 +146,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode: initialMode, onClose, 
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Guest login failed.');
+      setError(getFriendlyAuthErrorMessage(err));
     } finally {
       setSocialLoading(null);
     }
@@ -187,9 +188,21 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode: initialMode, onClose, 
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
-            <AlertCircle size={16} className="shrink-0 text-rose-400 mt-0.5" />
-            <div className="leading-relaxed">{error}</div>
+          <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-2">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle size={16} className="shrink-0 text-rose-400 mt-0.5" />
+              <div className="leading-relaxed">{error}</div>
+            </div>
+            <div className="pl-6 pt-1.5 border-t border-rose-500/20 text-[11px] text-rose-200/90 flex items-center justify-between gap-2 flex-wrap">
+              <span>Need help signing in?</span>
+              <a
+                href={createSupportMailto('login')}
+                className="underline hover:text-white font-medium inline-flex items-center gap-1 transition"
+                aria-label={`Contact our support team at ${SUPPORT_EMAIL}`}
+              >
+                Contact {SUPPORT_EMAIL}
+              </a>
+            </div>
           </div>
         )}
 
@@ -428,6 +441,16 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode: initialMode, onClose, 
               </button>
             </p>
           )}
+
+          <div className="pt-3 border-t border-slate-800/80 text-center text-[11px] text-slate-500">
+            <span>Need help signing in? Contact our support team at </span>
+            <a 
+              href={createSupportMailto('login')}
+              className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition font-medium"
+            >
+              {SUPPORT_EMAIL}
+            </a>
+          </div>
         </div>
       </div>
     </div>

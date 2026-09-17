@@ -39,7 +39,20 @@
             "currency": { "type": "string" },
             "notifications": { "type": "boolean" }
           }
+        },
+        "usage": {
+          "fields": {
+            "periodMonth": { "type": "string" },
+            "analysesCount": { "type": "number" },
+            "advisorMessagesCount": { "type": "number" },
+            "lastUpdated": { "type": "number" }
+          }
         }
+      }
+    },
+    "test": {
+      "fields": {
+        "status": { "type": "string" }
       }
     }
   }

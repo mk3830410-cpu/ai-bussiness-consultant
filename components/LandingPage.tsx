@@ -1,13 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './Header';
 import AuthForm from './AuthForm';
-import { BrainCircuit, Zap, BarChart, Eye, CheckCircle, ArrowRight, Star, Rocket, TrendingUp } from 'lucide-react';
+import { 
+  BrainCircuit, 
+  Zap, 
+  BarChart, 
+  Eye, 
+  CheckCircle, 
+  ArrowRight, 
+  Star, 
+  Rocket, 
+  TrendingUp, 
+  Mail, 
+  ExternalLink, 
+  HelpCircle,
+  ShieldCheck,
+  MessageSquare
+} from 'lucide-react';
+import { SUPPORT_EMAIL, createSupportMailto, SUPPORT_MESSAGES } from '../supportConfig';
+import { FAQSection } from './FAQSection';
 
 interface LandingPageProps {
   initialAuthMode?: 'login' | 'signup' | 'forgot' | null;
   onLoginSuccess?: () => void;
   onOpenLogin?: () => void;
   onOpenSignup?: () => void;
+  onNavigateSupport?: () => void;
 }
 
 const features = [
@@ -63,6 +81,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
   onLoginSuccess,
   onOpenLogin,
   onOpenSignup,
+  onNavigateSupport,
 }) => {
   const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot' | null>(initialAuthMode);
   const [isVisible, setIsVisible] = useState(false);
@@ -334,11 +353,136 @@ const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
         </section>
+
+        {/* Compact FAQ Section (Requirement 5) */}
+        <FAQSection id="faq" className="bg-gray-900/40 border-t border-gray-800/80" />
+
+        {/* Contact / Support Section (Requirement 3) */}
+        <section id="contact" className="py-20 bg-gray-900/80 border-t border-gray-800/80 relative">
+          <div className="container mx-auto px-4 max-w-4xl">
+            <div className="bg-gradient-to-br from-gray-900 via-indigo-950/30 to-gray-900 rounded-3xl p-8 md:p-12 border border-indigo-500/20 shadow-2xl relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="relative z-10 text-center max-w-2xl mx-auto">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-4">
+                  <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Support & Inquiries</span>
+                </div>
+
+                <h2 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+                  Need help?
+                </h2>
+
+                <p className="mt-4 text-base md:text-lg text-gray-300 leading-relaxed">
+                  We're here to help with your StratIQ account, subscriptions, payments, business strategies, and product feedback.
+                </p>
+
+                <div className="mt-8 p-5 rounded-2xl bg-gray-950/70 border border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Email Support</span>
+                    <div className="text-lg sm:text-xl font-mono font-bold text-white mt-0.5">
+                      {SUPPORT_EMAIL}
+                    </div>
+                  </div>
+
+                  <a
+                    href={createSupportMailto('general')}
+                    className="w-full sm:w-auto px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 shrink-0 focus:outline-none focus:ring-4 focus:ring-indigo-500/50"
+                    aria-label="Contact StratIQ Support"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>Contact Support</span>
+                  </a>
+                </div>
+
+                <p className="mt-4 text-xs text-gray-500">
+                  Looking for comprehensive support details? Check out our{' '}
+                  <a 
+                    href="/support" 
+                    onClick={(e) => {
+                      if (onNavigateSupport) {
+                        e.preventDefault();
+                        onNavigateSupport();
+                      }
+                    }}
+                    className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                  >
+                    StratIQ Support Page
+                  </a>
+                  {' '}for account, login, and billing guidance.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
-      <footer className="text-center py-8 text-gray-500 text-sm border-t border-gray-800/50 relative z-10">
-        <div className="container mx-auto px-4">
-          <p>Powered by StratIQ Intelligence Engine • Built with ❤️ for entrepreneurs</p>
+      {/* Footer (Requirement 2) */}
+      <footer className="bg-gray-950 border-t border-gray-800 text-gray-400 text-sm relative z-10">
+        <div className="container mx-auto px-4 py-12 max-w-6xl">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            {/* Brand column */}
+            <div className="md:col-span-2 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-600/20">
+                  <BrainCircuit className="w-4 h-4" />
+                </div>
+                <span className="text-xl font-black text-white tracking-tight">
+                  Strat<span className="text-indigo-400">IQ</span>
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 max-w-sm leading-relaxed">
+                The AI Business Co-Founder transforming startup ideas into validated business models, financial forecasts, and execution blueprints.
+              </p>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-300 mb-3">Product</h4>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#features" className="hover:text-white transition">Features</a></li>
+                <li><a href="#how-it-works" className="hover:text-white transition">How It Works</a></li>
+                <li><a href="#pricing" className="hover:text-white transition">Pricing Plans</a></li>
+                <li><a href="#faq" className="hover:text-white transition">FAQ</a></li>
+              </ul>
+            </div>
+
+            {/* Support section (Requirement 2) */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3">Support</h4>
+              <p className="text-xs text-gray-400 mb-2">Need help with StratIQ?</p>
+              <a
+                href={createSupportMailto('general')}
+                className="inline-flex items-center gap-2 text-xs font-semibold text-gray-200 hover:text-white bg-gray-900 border border-gray-800 hover:border-gray-700 px-3 py-2 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                aria-label={`Send email to ${SUPPORT_EMAIL}`}
+              >
+                <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{SUPPORT_EMAIL}</span>
+                <ExternalLink className="w-3 h-3 text-gray-500" />
+              </a>
+              <div className="mt-3">
+                <a
+                  href="/support"
+                  onClick={(e) => {
+                    if (onNavigateSupport) {
+                      e.preventDefault();
+                      onNavigateSupport();
+                    }
+                  }}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition"
+                >
+                  Visit Support Page →
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-gray-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+            <p>© {new Date().getFullYear()} StratIQ Intelligence Engine. All rights reserved.</p>
+            <div className="flex items-center gap-4">
+              <span>Official Support: {SUPPORT_EMAIL}</span>
+            </div>
+          </div>
         </div>
       </footer>
 

@@ -6,9 +6,11 @@ import {
   User, 
   RotateCcw, 
   Briefcase,
-  Cloud 
+  Cloud,
+  Lock,
+  Zap 
 } from 'lucide-react';
-import { ChatMessage, SavedStrategy, AnalysisResult } from '../types';
+import { ChatMessage, SavedStrategy, AnalysisResult, UserSubscription } from '../types';
 import { askBusinessAdvisor } from '../services/geminiService';
 import { auth } from '../services/authService';
 import { 
@@ -16,6 +18,8 @@ import {
   saveChatMessage, 
   clearChatHistory 
 } from '../services/firestoreService';
+import { UserUsage, isFounderProActive, isTeamScaleActive } from '../subscriptionConfig';
+import { recordAdvisorMessage } from '../services/usageService';
 
 interface BusinessAdvisorChatProps {
   currentStrategy?: SavedStrategy | null;
@@ -23,6 +27,9 @@ interface BusinessAdvisorChatProps {
   businessName?: string;
   businessIdea?: string;
   industry?: string;
+  subscription?: UserSubscription | null;
+  usage?: UserUsage | null;
+  onUpgradePro?: () => void;
 }
 
 export const BusinessAdvisorChat: React.FC<BusinessAdvisorChatProps> = ({
@@ -31,7 +38,15 @@ export const BusinessAdvisorChat: React.FC<BusinessAdvisorChatProps> = ({
   businessName,
   businessIdea,
   industry,
+  subscription,
+  usage,
+  onUpgradePro,
 }) => {
+  const isPaidActive = isFounderProActive(subscription) || isTeamScaleActive(subscription);
+  const advisorMessagesCount = usage?.advisorMessagesCount || 0;
+  const STARTER_ADVISOR_LIMIT = 10;
+  const isStarterLimitReached = !isPaidActive && advisorMessagesCount >= STARTER_ADVISOR_LIMIT;
+
   const activeName = currentStrategy?.businessName || businessName || 'Your Startup';
   const activeIndustry = currentStrategy?.industry || industry || 'Technology & Services';
   const activeIdea = currentStrategy?.inputs?.businessIdea || currentStrategy?.inputs?.userInput || businessIdea || '';
@@ -120,6 +135,11 @@ Select a quick topic below or type your strategic question:`,
     const query = (textToSend || input).trim();
     if (!query || isTyping) return;
 
+    if (isStarterLimitReached) {
+      onUpgradePro?.();
+      return;
+    }
+
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -170,6 +190,11 @@ Select a quick topic below or type your strategic question:`,
           console.warn('Could not save AI message to Firestore:', err)
         );
       }
+
+      // Record advisor message usage count
+      recordAdvisorMessage().catch(err => {
+        console.warn('Could not record advisor message usage:', err);
+      });
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -213,8 +238,17 @@ Select a quick topic below or type your strategic question:`,
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 Active Context
               </span>
+              {isPaidActive ? (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">
+                  <Zap size={11} className="text-amber-400" /> Priority 24/7 Support
+                </span>
+              ) : (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold border border-slate-700">
+                  Starter ({advisorMessagesCount}/{STARTER_ADVISOR_LIMIT} messages)
+                </span>
+              )}
               {currentUid && (
-                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium">
                   <Cloud size={11} className="text-indigo-400" /> Synced
                 </span>
               )}
@@ -307,30 +341,56 @@ Select a quick topic below or type your strategic question:`,
         ))}
       </div>
 
-      {/* Input Form */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSendMessage();
-        }}
-        className="p-4 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask StratIQ about scaling ${activeName}...`}
-          disabled={isTyping}
-          className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || isTyping}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl transition disabled:opacity-50 shadow-md shadow-indigo-600/20"
+      {/* Input Form or Limit Reached Banner */}
+      {isStarterLimitReached ? (
+        <div className="p-5 bg-gradient-to-r from-indigo-950/80 via-slate-900 to-purple-950/80 border-t border-indigo-500/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-500/40 text-amber-300 flex items-center justify-center shrink-0">
+              <Lock size={18} />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-white">
+                Monthly Starter Message Limit Reached ({STARTER_ADVISOR_LIMIT}/{STARTER_ADVISOR_LIMIT})
+              </p>
+              <p className="text-[11px] sm:text-xs text-slate-400">
+                Upgrade to Founder Pro for priority 24/7 AI Advisor support and unlimited strategic conversations.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onUpgradePro}
+            className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 shrink-0 transition-transform transform hover:scale-105"
+          >
+            <Zap size={14} className="text-amber-300" />
+            <span>Upgrade to Founder Pro — $29/mo</span>
+          </button>
+        </div>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage();
+          }}
+          className="p-4 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
         >
-          <Send size={16} />
-        </button>
-      </form>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={`Ask StratIQ about scaling ${activeName}...`}
+            disabled={isTyping}
+            className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isTyping}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl transition disabled:opacity-50 shadow-md shadow-indigo-600/20"
+          >
+            <Send size={16} />
+          </button>
+        </form>
+      )}
     </div>
   );
 };

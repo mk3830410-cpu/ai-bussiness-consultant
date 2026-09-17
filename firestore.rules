@@ -10,6 +10,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Health check endpoint
+    match /test/{testId} {
+      allow read: if true;
+    }
+
     // User profile document
     match /users/{userId} {
       allow read: if isAuthenticated();
@@ -42,6 +47,11 @@ service cloud.firestore {
 
       // User chats subcollection
       match /chats/{chatId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User usage subcollection
+      match /usage/{usageId} {
         allow read, write: if isOwner(userId);
       }
     }

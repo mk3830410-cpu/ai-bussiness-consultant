@@ -7,12 +7,37 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 10000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://mk3830410-cpu-ai-bussiness-consulta.vercel.app';
-const ALLOWED_ORIGINS = [
-  FRONTEND_URL,
+
+// Helper to parse comma-separated origin strings and normalize trailing slashes
+function parseOriginList(val) {
+  if (!val) return [];
+  return val
+    .split(',')
+    .map((item) => item.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+}
+
+const DEV_PREVIEW_ORIGINS = parseOriginList(process.env.DEV_PREVIEW_ORIGINS);
+const ADDITIONAL_ALLOWED_ORIGINS = parseOriginList(process.env.ADDITIONAL_ALLOWED_ORIGINS);
+
+const isProduction = NODE_ENV === 'production';
+
+// Production allowed origins: ONLY explicitly configured origins. Never wildcard (*).
+const PRODUCTION_ALLOWED_ORIGINS = Array.from(new Set([
+  FRONTEND_URL.replace(/\/+$/, ''),
+  'https://mk3830410-cpu-ai-bussiness-consulta.vercel.app',
+  ...ADDITIONAL_ALLOWED_ORIGINS
+])).filter(Boolean);
+
+// Development allowed origins: FRONTEND_URL, localhost ports, DEV_PREVIEW_ORIGINS, ADDITIONAL_ALLOWED_ORIGINS
+const DEV_ALLOWED_ORIGINS = Array.from(new Set([
+  FRONTEND_URL.replace(/\/+$/, ''),
   'https://mk3830410-cpu-ai-bussiness-consulta.vercel.app',
   'http://localhost:5173',
-  'http://localhost:3000'
-];
+  'http://localhost:3000',
+  ...DEV_PREVIEW_ORIGINS,
+  ...ADDITIONAL_ALLOWED_ORIGINS
+])).filter(Boolean);
 
 // ============================================================
 // EXPRESS
@@ -26,20 +51,57 @@ const app = express();
 // Security headers
 app.use(helmet());
 
-// Strict CORS for frontend origins (never wildcard * on authenticated routes)
-app.use(cors({
+// CORS configuration
+const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, server-to-server)
-    if (!origin) return callback(null, true);
-    if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || origin.endsWith('.vercel.app') || origin.includes('localhost')) {
+    // Allow requests with no origin (mobile apps, curl, server-to-server webhooks like Razorpay)
+    if (!origin) {
       return callback(null, true);
     }
-    return callback(new Error('CORS policy: Not allowed by CORS origin restriction'));
+
+    const cleanOrigin = origin.replace(/\/+$/, '');
+    
+    // Log ONLY the origin for debugging (never log auth headers, tokens, or credentials)
+    console.log(`[StratIQ CORS] Request origin: ${cleanOrigin}`);
+
+    let isAllowed = false;
+
+    if (isProduction) {
+      // PRODUCTION MODE: Strictly allow only explicitly configured production origins
+      isAllowed = PRODUCTION_ALLOWED_ORIGINS.includes(cleanOrigin);
+    } else {
+      // DEVELOPMENT MODE: FRONTEND_URL, localhost, and DEV_PREVIEW_ORIGINS
+      const isLocalhost = 
+        cleanOrigin.startsWith('http://localhost:') || 
+        cleanOrigin.startsWith('http://127.0.0.1:');
+
+      isAllowed = isLocalhost || DEV_ALLOWED_ORIGINS.includes(cleanOrigin);
+    }
+
+    if (isAllowed) {
+      console.log(`[StratIQ CORS] Allowed origin: ${cleanOrigin}`);
+      return callback(null, true);
+    } else {
+      console.warn(`[StratIQ CORS] Rejected origin: ${cleanOrigin}`);
+      const err = new Error(`CORS policy: Not allowed by CORS origin restriction`);
+      err.statusCode = 403;
+      return callback(err);
+    }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Razorpay-Signature', 'X-Razorpay-Event-Id']
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Razorpay-Signature',
+    'X-Razorpay-Event-Id'
+  ],
+  optionsSuccessStatus: 204
+};
+
+// Mount CORS middleware & handle preflight OPTIONS across all routes
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Capture raw body buffer for Razorpay webhook signature verification
 app.use(express.json({
@@ -553,6 +615,268 @@ app.get('/api/subscription/me', async (req, res, next) => {
 });
 
 // ============================================================
+// USAGE & SUBSCRIPTION ENTITLEMENT ENFORCEMENT
+// ============================================================
+
+function getCurrentMonthKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+/**
+ * GET /api/usage/me
+ * Returns the caller's usage data and verified subscription tier from Firestore
+ */
+app.get('/api/usage/me', async (req, res, next) => {
+  try {
+    const decodedToken = await verifyFirebaseUser(req);
+    const uid = decodedToken.uid;
+
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Firestore database is not initialized on the server.'
+      });
+    }
+
+    const currentPeriod = getCurrentMonthKey();
+    const [userDoc, usageDoc] = await Promise.all([
+      db.collection('users').doc(uid).get(),
+      db.collection('users').doc(uid).collection('usage').doc('current').get()
+    ]);
+
+    const userData = userDoc.exists ? userDoc.data() : null;
+    const subscription = userData?.subscription || {
+      plan: userData?.subscriptionPlan || 'starter',
+      status: userData?.subscriptionPlan === 'pro' ? 'active' : 'inactive'
+    };
+
+    let usage = usageDoc.exists ? usageDoc.data() : null;
+    if (!usage || usage.periodMonth !== currentPeriod) {
+      usage = {
+        periodMonth: currentPeriod,
+        analysesCount: 0,
+        advisorMessagesCount: 0,
+        lastUpdated: Date.now()
+      };
+    }
+
+    return res.status(200).json({
+      success: true,
+      subscription,
+      usage
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/usage/record-analysis
+ * Authoritatively verifies the user's plan and enforces Starter restrictions:
+ * - Starter plan: Max 3 Quick Brainstorms/Market Pulse per month.
+ * - Deep Dive & Visual Spark: Forbidden on Starter; requires active Founder Pro.
+ */
+app.post('/api/usage/record-analysis', async (req, res, next) => {
+  try {
+    const decodedToken = await verifyFirebaseUser(req);
+    const uid = decodedToken.uid;
+    const mode = req.body?.mode || 'quick';
+    const currentPeriod = getCurrentMonthKey();
+
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Firestore is not initialized on the server.'
+      });
+    }
+
+    // 1. Fetch user's subscription and current monthly usage
+    const [userDoc, usageDoc] = await Promise.all([
+      db.collection('users').doc(uid).get(),
+      db.collection('users').doc(uid).collection('usage').doc('current').get()
+    ]);
+
+    const userData = userDoc.exists ? userDoc.data() : null;
+    const subscription = userData?.subscription || {
+      plan: userData?.subscriptionPlan || 'starter',
+      status: userData?.subscriptionPlan === 'pro' ? 'active' : 'inactive'
+    };
+
+    const isPro = subscription?.plan === 'pro' && subscription?.status === 'active';
+    const isEnterprise = subscription?.plan === 'enterprise' && subscription?.status === 'active';
+    const isPaidActive = isPro || isEnterprise;
+
+    // 2. Feature Gating: Deep Dive & Visual Spark require active Founder Pro
+    if (!isPaidActive && (mode === 'deep' || mode === 'visual')) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN_FEATURE',
+        requiredPlan: 'pro',
+        feature: mode === 'deep' ? 'Deep Dive Strategy' : 'Visual Spark Analysis',
+        message: `${mode === 'deep' ? 'Deep Dive Strategies' : 'Visual Spark Analysis'} is available with Founder Pro. Upgrade to continue.`
+      });
+    }
+
+    // 3. Rate Limiting: Starter plan is capped at 3 analyses per month
+    let usage = usageDoc.exists ? usageDoc.data() : null;
+    if (!usage || usage.periodMonth !== currentPeriod) {
+      usage = {
+        periodMonth: currentPeriod,
+        analysesCount: 0,
+        advisorMessagesCount: 0,
+        lastUpdated: Date.now()
+      };
+    }
+
+    if (!isPaidActive && usage.analysesCount >= 3) {
+      return res.status(403).json({
+        success: false,
+        code: 'LIMIT_REACHED',
+        requiredPlan: 'pro',
+        limit: 3,
+        currentUsage: usage.analysesCount,
+        message: 'Your Starter plan limit has been reached (3 Quick Brainstorms per month). Upgrade to Founder Pro to continue.'
+      });
+    }
+
+    // 4. Increment usage
+    const updatedUsage = {
+      periodMonth: currentPeriod,
+      analysesCount: (usage.analysesCount || 0) + 1,
+      advisorMessagesCount: usage.advisorMessagesCount || 0,
+      lastUpdated: Date.now()
+    };
+
+    await db.collection('users').doc(uid).collection('usage').doc('current').set(updatedUsage, { merge: true });
+
+    return res.status(200).json({
+      success: true,
+      usage: updatedUsage,
+      remaining: isPaidActive ? 'unlimited' : Math.max(0, 3 - updatedUsage.analysesCount)
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/usage/record-advisor
+ * Enforces free advisor limits for Starter users (5 messages/mo)
+ */
+app.post('/api/usage/record-advisor', async (req, res, next) => {
+  try {
+    const decodedToken = await verifyFirebaseUser(req);
+    const uid = decodedToken.uid;
+    const currentPeriod = getCurrentMonthKey();
+
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Firestore is not initialized.'
+      });
+    }
+
+    const [userDoc, usageDoc] = await Promise.all([
+      db.collection('users').doc(uid).get(),
+      db.collection('users').doc(uid).collection('usage').doc('current').get()
+    ]);
+
+    const userData = userDoc.exists ? userDoc.data() : null;
+    const subscription = userData?.subscription || {
+      plan: userData?.subscriptionPlan || 'starter',
+      status: 'inactive'
+    };
+
+    const isPaidActive = (subscription?.plan === 'pro' || subscription?.plan === 'enterprise') && subscription?.status === 'active';
+
+    let usage = usageDoc.exists ? usageDoc.data() : null;
+    if (!usage || usage.periodMonth !== currentPeriod) {
+      usage = {
+        periodMonth: currentPeriod,
+        analysesCount: 0,
+        advisorMessagesCount: 0,
+        lastUpdated: Date.now()
+      };
+    }
+
+    if (!isPaidActive && usage.advisorMessagesCount >= 5) {
+      return res.status(403).json({
+        success: false,
+        code: 'LIMIT_REACHED',
+        requiredPlan: 'pro',
+        message: 'You have reached your 5 free AI Advisor questions for this month. Upgrade to Founder Pro for priority 24/7 AI Advisor support.'
+      });
+    }
+
+    const updatedUsage = {
+      periodMonth: currentPeriod,
+      analysesCount: usage.analysesCount || 0,
+      advisorMessagesCount: (usage.advisorMessagesCount || 0) + 1,
+      lastUpdated: Date.now()
+    };
+
+    await db.collection('users').doc(uid).collection('usage').doc('current').set(updatedUsage, { merge: true });
+
+    return res.status(200).json({
+      success: true,
+      usage: updatedUsage,
+      remaining: isPaidActive ? 'unlimited' : Math.max(0, 5 - updatedUsage.advisorMessagesCount)
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/entitlements/verify
+ * Validates whether user is entitled to perform protected actions:
+ * - 'financial_projections'
+ * - 'csv_export'
+ * - 'pdf_export'
+ * - 'strategy_comparison'
+ */
+app.post('/api/entitlements/verify', async (req, res, next) => {
+  try {
+    const decodedToken = await verifyFirebaseUser(req);
+    const uid = decodedToken.uid;
+    const feature = req.body?.feature;
+
+    if (!db) {
+      return res.status(503).json({ success: false, message: 'Firestore is not initialized.' });
+    }
+
+    const userDoc = await db.collection('users').doc(uid).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
+    const subscription = userData?.subscription || { plan: 'starter', status: 'inactive' };
+
+    const isPro = subscription?.plan === 'pro' && subscription?.status === 'active';
+    const isEnterprise = subscription?.plan === 'enterprise' && subscription?.status === 'active';
+    const isPaidActive = isPro || isEnterprise;
+
+    if (!isPaidActive) {
+      return res.status(403).json({
+        success: false,
+        entitled: false,
+        requiredPlan: 'pro',
+        feature,
+        message: `This feature (${feature}) is available with Founder Pro. Upgrade to continue.`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      entitled: true,
+      plan: isEnterprise ? 'enterprise' : 'pro'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================
 // ERROR HANDLING
 // ============================================================
 app.use((err, req, res, next) => {
@@ -583,7 +907,12 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(`🚀 StratIQ Backend API Server running on port ${PORT}`);
   console.log(`🌐 Listening on 0.0.0.0:${PORT}`);
-  console.log(`🔒 Environment: ${NODE_ENV}`);
-  console.log(`🔗 Allowed Frontend: ${FRONTEND_URL}`);
+  console.log(`🔒 Mode: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+  console.log(`🔗 Allowed Origins (${isProduction ? 'Production' : 'Development'}):`);
+  const activeOrigins = isProduction ? PRODUCTION_ALLOWED_ORIGINS : DEV_ALLOWED_ORIGINS;
+  activeOrigins.forEach((orig) => console.log(`   - ${orig}`));
+  if (!isProduction && DEV_PREVIEW_ORIGINS.length > 0) {
+    console.log(`   (DEV_PREVIEW_ORIGINS loaded: ${DEV_PREVIEW_ORIGINS.length})`);
+  }
   console.log(`====================================================`);
 });

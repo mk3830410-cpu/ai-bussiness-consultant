@@ -56,6 +56,16 @@ import {
   createProSubscription, 
   verifySubscriptionPayment 
 } from './services/subscriptionService';
+import { 
+  UserUsage, 
+  isFounderProActive, 
+  isTeamScaleActive 
+} from './subscriptionConfig';
+import { 
+  subscribeToUserUsage, 
+  recordAnalysisRun, 
+  getCachedUsage 
+} from './services/usageService';
 
 const AppContent: React.FC = () => {
   const { showToast } = useToast();
@@ -275,6 +285,20 @@ const AppContent: React.FC = () => {
   // Collaboration State
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+
+  // User Monthly Usage Tracking & Subscription Limits
+  const [usage, setUsage] = useState<UserUsage>(() => getCachedUsage(user?.uid || 'guest'));
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setUsage(getCachedUsage('guest'));
+      return;
+    }
+    const unsubscribe = subscribeToUserUsage(user.uid, (freshUsage) => {
+      setUsage(freshUsage);
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   // Load Firestore data whenever authenticated user changes
   useEffect(() => {
@@ -566,6 +590,21 @@ const AppContent: React.FC = () => {
     selectedMode: AnalysisMode, 
     uploadedImage?: { b64: string; mimeType: string; file: File } | null
   ) => {
+    const isPaidActive = isFounderProActive(subscription) || isTeamScaleActive(subscription);
+
+    // Enforce Starter plan restrictions
+    if (!isPaidActive && selectedMode !== 'quick' && selectedMode !== 'market') {
+      showToast('Deep Dive Strategy and Visual Spark require Founder Pro.', 'error');
+      setCurrentTab('pricing');
+      return;
+    }
+
+    if (!isPaidActive && (usage?.analysesCount || 0) >= 3) {
+      showToast('You have used all 3 monthly Quick Brainstorms on Starter. Upgrade to Founder Pro for unlimited analyses.', 'error');
+      setCurrentTab('pricing');
+      return;
+    }
+
     const composedText = `Startup Name: ${wizardData.businessName || 'Unnamed'}\nIndustry: ${wizardData.industry}\nTarget Customer: ${wizardData.targetCustomer}\nGeographic Market: ${wizardData.location}\nBusiness Model: ${wizardData.businessModel}\nStage: ${wizardData.stage}\nPrimary Goal: ${wizardData.primaryGoal}\nTarget Revenue: ${wizardData.targetRevenue}\nTimeline: ${wizardData.timeline}\nBudget: ${wizardData.budget}\n\nCore Concept:\n${wizardData.businessIdea}`;
 
     setIsLoading(true);
@@ -583,6 +622,17 @@ const AppContent: React.FC = () => {
         industry: wizardData.industry,
         fullInputText: composedText,
       });
+
+      // Record analysis run usage in backend and Firestore
+      try {
+        const freshUsage = await recordAnalysisRun(selectedMode);
+        if (freshUsage) {
+          setUsage(freshUsage);
+        }
+      } catch (recErr: any) {
+        console.warn('Could not record analysis usage:', recErr);
+      }
+
       showToast('Comprehensive business blueprint generated and saved to Firestore!', 'success');
     } catch (err: any) {
       console.error(err);
@@ -723,6 +773,12 @@ const AppContent: React.FC = () => {
   };
 
   const handleExportStrategyPdf = async (strat: SavedStrategy) => {
+    const isPaidActive = isFounderProActive(subscription) || isTeamScaleActive(subscription);
+    if (!isPaidActive) {
+      showToast('Exporting to PDF is a Founder Pro feature.', 'error');
+      setCurrentTab('pricing');
+      return;
+    }
     try {
       await exportStrategyToPdf({
         result: strat.result,
@@ -834,6 +890,7 @@ const AppContent: React.FC = () => {
               stats={overviewStats}
               recentStrategies={savedStrategies}
               subscription={subscription}
+              usage={usage}
               onStartNewAnalysis={() => setCurrentTab('new_analysis')}
               onOpenAdvisor={() => setCurrentTab('advisor')}
               onOpenStrategy={handleOpenStrategy}
@@ -874,6 +931,9 @@ const AppContent: React.FC = () => {
                   isLoading={isLoading}
                   isVerified={isEmailVerified || isAnonymous}
                   initialData={wizardPrefill || undefined}
+                  subscription={subscription}
+                  usage={usage}
+                  onUpgradePro={() => setCurrentTab('pricing')}
                 />
               )}
 
@@ -906,6 +966,8 @@ const AppContent: React.FC = () => {
                   onAddComment={handleAddComment}
                   isCollaborative={currentPlan === 'enterprise'}
                   wizardData={currentWizardData}
+                  subscription={subscription}
+                  onUpgradePro={() => setCurrentTab('pricing')}
                 />
               )}
             </div>
@@ -944,6 +1006,9 @@ const AppContent: React.FC = () => {
                 businessName={activeStrategy?.businessName || 'My Venture'}
                 businessIdea={activeStrategy?.inputs?.businessIdea || activeStrategy?.inputs?.userInput || userInput}
                 industry={activeStrategy?.industry || 'Technology & Services'}
+                subscription={subscription}
+                usage={usage}
+                onUpgradePro={() => setCurrentTab('pricing')}
               />
             </div>
           )}

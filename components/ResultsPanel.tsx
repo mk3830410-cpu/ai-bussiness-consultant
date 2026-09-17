@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo, FC } from 'react';
-import { AnalysisResult, AnalysisMode, StrategyResponse, MarketPulseResponse, QuickResponse, VisualAnalysisResponse, CustomerPersona, PricingModel, PitchDeckSlide, LegalInsight, CustomerJourneyStage, MonetizationStrategy, Comment } from '../types';
-import { Target, Users, Gem, Zap, Lightbulb, Bot, Image as ImageIcon, ChevronDown, FileText, Briefcase, BarChart, Palette, Type as TypeIcon, UserCheck, Shield, Globe, Star, Link as LinkIcon, BrainCircuit, Search, Eye, TrendingUp, Megaphone, ShoppingCart, Heart, Repeat, Map, CheckCircle, Download, DollarSign, Linkedin, X, CheckSquare, ExternalLink, MessageSquare, Edit2, Save, Share2, Copy, Check, FileDown, Sparkles } from 'lucide-react';
+import { AnalysisResult, AnalysisMode, StrategyResponse, MarketPulseResponse, QuickResponse, VisualAnalysisResponse, CustomerPersona, PricingModel, PitchDeckSlide, LegalInsight, CustomerJourneyStage, MonetizationStrategy, Comment, UserSubscription } from '../types';
+import { Target, Users, Gem, Zap, Lightbulb, Bot, Image as ImageIcon, ChevronDown, FileText, Briefcase, BarChart, Palette, Type as TypeIcon, UserCheck, Shield, Globe, Star, Link as LinkIcon, BrainCircuit, Search, Eye, TrendingUp, Megaphone, ShoppingCart, Heart, Repeat, Map, CheckCircle, Download, DollarSign, Linkedin, X, CheckSquare, ExternalLink, MessageSquare, Edit2, Save, Share2, Copy, Check, FileDown, Sparkles, Lock } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { createPortal } from 'react-dom';
@@ -21,6 +21,7 @@ import { MilestoneTimelineWidget } from './MilestoneTimelineWidget';
 import { CompetitorBubbleChart } from './CompetitorBubbleChart';
 import { WizardData } from '../types';
 import { ShieldAlert, ListOrdered, Coins, Users2, Printer, Layers, Compass, FileCode, Calculator, Calendar, ArrowLeft } from 'lucide-react';
+import { isFounderProActive, isTeamScaleActive } from '../subscriptionConfig';
 
 // --- PDF Export Modal Component ---
 interface ExportPdfModalProps {
@@ -97,6 +98,8 @@ interface ResultsPanelProps {
   onAddComment: (sectionId: string, text: string) => void;
   isCollaborative: boolean;
   wizardData?: WizardData | null;
+  subscription?: UserSubscription;
+  onUpgradePro?: () => void;
 }
 
 interface PrintableReportProps {
@@ -107,6 +110,7 @@ interface PrintableReportProps {
 
 const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
   const { showToast } = useToast();
+  const isPaidActive = isFounderProActive(props.subscription) || isTeamScaleActive(props.subscription);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -251,6 +255,10 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
 
   const handleExportFinancialsCsv = () => {
     if (!props.analysisResult) return;
+    if (!isPaidActive) {
+      props.onUpgradePro?.();
+      return;
+    }
     const deep = props.analysisResult as any;
     const projections = deep?.financialProjections;
     if (!projections || projections.length === 0) {
@@ -271,6 +279,14 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
     } finally {
       setIsExportingCsv(false);
     }
+  };
+
+  const handlePrintExportClick = () => {
+    if (!isPaidActive) {
+      props.onUpgradePro?.();
+      return;
+    }
+    setShowPrintPreview(true);
   };
 
   const handleExportMarkdown = () => {
@@ -365,6 +381,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
             isLogoLoading={props.isLogoLoading} 
             context={renderContext} 
             wizardData={props.wizardData}
+            isPaidActive={isPaidActive}
+            onUpgradePro={props.onUpgradePro}
           />
         )
     },
@@ -457,11 +475,14 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
                id="export-financials-csv-btn"
                onClick={handleExportFinancialsCsv}
                disabled={isExportingCsv}
-               className="inline-flex items-center justify-center px-3.5 py-2 text-xs md:text-sm font-semibold text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 rounded-xl hover:bg-emerald-900/60 hover:text-white hover:border-emerald-500/70 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all shadow-sm"
-               title="Export financial projections directly to CSV"
+               className="inline-flex items-center justify-center px-3.5 py-2 text-xs md:text-sm font-semibold text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 rounded-xl hover:bg-emerald-900/60 hover:text-white hover:border-emerald-500/70 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all shadow-sm gap-1.5"
+               title={isPaidActive ? "Export financial projections directly to CSV" : "Export to CSV is available with Founder Pro"}
              >
-               <Download size={15} className="mr-1.5 text-emerald-400" />
+               <Download size={15} className="text-emerald-400" />
                <span>{isExportingCsv ? 'Exporting...' : 'Export Financials CSV'}</span>
+               {!isPaidActive && (
+                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 border border-amber-500/40">PRO</span>
+               )}
              </button>
            )}
 
@@ -478,12 +499,15 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
 
            <button
              id="print-export-pdf-btn"
-             onClick={() => setShowPrintPreview(true)}
-             className="inline-flex items-center justify-center px-4 py-2 text-xs md:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-550 active:bg-indigo-700 shadow-lg shadow-indigo-900/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/40 transition-all"
-             title="Open Print Preview to customize sections, print, or download PDF"
+             onClick={handlePrintExportClick}
+             className="inline-flex items-center justify-center px-4 py-2 text-xs md:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-550 active:bg-indigo-700 shadow-lg shadow-indigo-900/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/40 transition-all gap-1.5"
+             title={isPaidActive ? "Open Print Preview to customize sections, print, or download PDF" : "Export to PDF is available with Founder Pro"}
            >
-             <FileDown size={16} className="mr-2" />
+             <FileDown size={16} />
              <span>Print / Export PDF</span>
+             {!isPaidActive && (
+               <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-slate-950">PRO</span>
+             )}
            </button>
         </div>
       </div>
@@ -763,9 +787,11 @@ interface DeepDiveProps {
   isPrintable?: boolean;
   context?: any;
   wizardData?: WizardData | null;
+  isPaidActive?: boolean;
+  onUpgradePro?: () => void;
 }
 
-const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLogoLoading, isPrintable = false, context, wizardData }) => {
+const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLogoLoading, isPrintable = false, context, wizardData, isPaidActive = true, onUpgradePro }) => {
     const { showToast } = useToast();
 
     const handleLinkedInShare = (slide: PitchDeckSlide) => {
@@ -910,56 +936,84 @@ const DeepDiveResults: React.FC<DeepDiveProps> = ({ strategy, logoImageUrl, isLo
             isPrintable={isPrintable} 
             context={context}
             onCopySection={() => {
+                if (!isPaidActive) {
+                  onUpgradePro?.();
+                  return;
+                }
                 const text = strategy.financialProjections.map(p => `Year ${p.year}:\n• Projected Revenue: ${p.revenue}\n• Projected Costs: ${p.costs}\n• Assumptions: ${p.assumptions}`).join('\n\n');
                 navigator.clipboard.writeText(text);
                 showToast('Financial projections copied to clipboard!', 'success', 'copy');
             }}
         >
-            <div className="space-y-6">
-                {!isPrintable && (
-                    <FinancialCharts projections={strategy.financialProjections} />
-                )}
-
-                <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-bold text-gray-300">Annual Breakdown & Assumptions</h4>
-                    {!isPrintable && (
+            {!isPaidActive && !isPrintable ? (
+                <div className="relative p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-indigo-950/50 via-slate-900/90 to-purple-950/40 border border-indigo-500/40 text-center overflow-hidden my-2">
+                    <div className="max-w-lg mx-auto relative z-10">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/20">
+                            <Lock size={24} />
+                        </div>
+                        <h4 className="text-lg font-extrabold text-white mb-2">
+                            Financial Projections (3 Years) is available with Founder Pro
+                        </h4>
+                        <p className="text-xs sm:text-sm text-slate-300 mb-6 leading-relaxed">
+                            Access interactive charts, 3-year revenue forecasts, operating cost breakdown, profit margin models, and CSV export.
+                        </p>
                         <button
                             type="button"
-                            onClick={() => {
-                                const name = strategy.brandIdentity?.companyNameSuggestions?.[0] || 'venture';
-                                exportFinancialProjectionsCsv(strategy.financialProjections, name);
-                                showToast('Financial projections exported', 'success', 'download');
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-semibold transition-all shadow-sm"
-                            title="Export financial table as CSV"
+                            onClick={onUpgradePro}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-xl shadow-indigo-600/30 transition-all transform hover:scale-105"
                         >
-                            <Download size={13} className="text-emerald-400" />
-                            <span>Export Financials CSV</span>
+                            <Zap size={15} className="text-amber-300" />
+                            <span>Upgrade to Founder Pro — $29/mo</span>
                         </button>
-                    )}
+                    </div>
                 </div>
-                <div className="space-y-4">
-                        {strategy.financialProjections.map((proj, i) => (
-                            <div key={i} className="p-4 bg-gray-900/70 rounded-lg border border-gray-700">
-                                <h4 className="text-lg font-bold text-white mb-2">Year {proj.year}</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                    <div className="flex justify-between border-b border-gray-700 pb-1">
-                                        <span className="text-gray-400">Projected Revenue:</span>
-                                        <span className="font-semibold text-green-400">{proj.revenue}</span>
-                                    </div>
-                                    <div className="flex justify-between border-b border-gray-700 pb-1">
-                                        <span className="text-gray-400">Projected Costs:</span>
-                                        <span className="font-semibold text-red-400">{proj.costs}</span>
-                                    </div>
-                                    <div className="md:col-span-2 mt-2">
-                                        <p className="text-gray-400 text-xs">Assumptions:</p>
-                                        <p className="text-gray-300">{proj.assumptions}</p>
+            ) : (
+                <div className="space-y-6">
+                    {!isPrintable && (
+                        <FinancialCharts projections={strategy.financialProjections} />
+                    )}
+
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-bold text-gray-300">Annual Breakdown & Assumptions</h4>
+                        {!isPrintable && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const name = strategy.brandIdentity?.companyNameSuggestions?.[0] || 'venture';
+                                    exportFinancialProjectionsCsv(strategy.financialProjections, name);
+                                    showToast('Financial projections exported', 'success', 'download');
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-semibold transition-all shadow-sm"
+                                title="Export financial table as CSV"
+                            >
+                                <Download size={13} className="text-emerald-400" />
+                                <span>Export Financials CSV</span>
+                            </button>
+                        )}
+                    </div>
+                    <div className="space-y-4">
+                            {strategy.financialProjections.map((proj, i) => (
+                                <div key={i} className="p-4 bg-gray-900/70 rounded-lg border border-gray-700">
+                                    <h4 className="text-lg font-bold text-white mb-2">Year {proj.year}</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                        <div className="flex justify-between border-b border-gray-700 pb-1">
+                                            <span className="text-gray-400">Projected Revenue:</span>
+                                            <span className="font-semibold text-green-400">{proj.revenue}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-gray-700 pb-1">
+                                            <span className="text-gray-400">Projected Costs:</span>
+                                            <span className="font-semibold text-red-400">{proj.costs}</span>
+                                        </div>
+                                        <div className="md:col-span-2 mt-2">
+                                            <p className="text-gray-400 text-xs">Assumptions:</p>
+                                            <p className="text-gray-300">{proj.assumptions}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
                     </div>
-            </div>
+                </div>
+            )}
         </AccordionSection>
 
         {!isPrintable && (
