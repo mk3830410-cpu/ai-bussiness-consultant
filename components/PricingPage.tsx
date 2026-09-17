@@ -7,16 +7,20 @@ interface PricingPageProps {
   subscription?: UserSubscription;
   isProcessing?: boolean;
   onGetPro?: () => void;
+  onGetTeamScale?: () => void;
 }
 
 const PricingPage: React.FC<PricingPageProps> = ({ 
   onSelectPlan, 
   subscription,
   isProcessing = false,
-  onGetPro
+  onGetPro,
+  onGetTeamScale
 }) => {
   const isProActive = subscription?.plan === 'pro' && subscription?.status === 'active';
   const isProPending = subscription?.plan === 'pro' && subscription?.status === 'pending';
+  const isEnterpriseActive = subscription?.plan === 'enterprise' && subscription?.status === 'active';
+  const isEnterprisePending = subscription?.plan === 'enterprise' && subscription?.status === 'pending';
   const isHalted = subscription?.status === 'halted';
   const isCancelled = subscription?.status === 'cancelled';
 
@@ -36,6 +40,18 @@ const PricingPage: React.FC<PricingPageProps> = ({
     proButtonText = 'Fix Payment';
   }
 
+  // Determine button state for Team Scale ($99/mo)
+  let enterpriseButtonText = 'Get Team Scale';
+  let isEnterpriseDisabled = false;
+
+  if (isProcessing || isEnterprisePending) {
+    enterpriseButtonText = 'Processing...';
+    isEnterpriseDisabled = true;
+  } else if (isEnterpriseActive) {
+    enterpriseButtonText = 'Current Plan';
+    isEnterpriseDisabled = true;
+  }
+
   const plans = [
     {
       id: 'free',
@@ -50,8 +66,8 @@ const PricingPage: React.FC<PricingPageProps> = ({
         'Community Support',
         'Single User'
       ],
-      buttonText: !isProActive ? 'Current Plan' : 'Free Tier',
-      disabled: !isProActive,
+      buttonText: (!isProActive && !isEnterpriseActive) ? 'Current Plan' : 'Free Tier',
+      disabled: (!isProActive && !isEnterpriseActive),
       popular: false,
       tier: 'free' as SubscriptionTier
     },
@@ -83,13 +99,14 @@ const PricingPage: React.FC<PricingPageProps> = ({
       description: 'Collaboration tools for growing teams.',
       features: [
         'Everything in Pro',
-        'Team Collaboration (Up to 5)',
+        'Team Collaboration (Up to 5 seats)',
         'Shared Editing & Comments',
-        'White-label Reports',
-        'Dedicated Account Manager'
+        'White-label Strategy Reports',
+        'Dedicated Account Manager',
+        'Custom Invoicing & GST Support'
       ],
-      buttonText: 'Contact Sales',
-      disabled: false,
+      buttonText: enterpriseButtonText,
+      disabled: isEnterpriseDisabled,
       popular: false,
       tier: 'enterprise' as SubscriptionTier
     }
@@ -103,8 +120,11 @@ const PricingPage: React.FC<PricingPageProps> = ({
         onSelectPlan('pro');
       }
     } else if (plan.id === 'enterprise') {
-      // Team Scale: keeps "Contact Sales"
-      window.open('mailto:sales@stratiq.ai?subject=StratIQ%20Team%20Scale%20Inquiry', '_blank');
+      if (onGetTeamScale) {
+        onGetTeamScale();
+      } else {
+        onSelectPlan('enterprise');
+      }
     } else {
       onSelectPlan(plan.tier);
     }
@@ -128,7 +148,14 @@ const PricingPage: React.FC<PricingPageProps> = ({
           </div>
         )}
 
-        {isProPending && (
+        {isEnterpriseActive && (
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-semibold">
+            <ShieldCheck className="w-4 h-4" />
+            <span>You currently have an active Team Scale ($99/mo) plan</span>
+          </div>
+        )}
+
+        {(isProPending || isEnterprisePending) && (
           <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
             <AlertCircle className="w-4 h-4 animate-pulse" />
             <span>Payment confirmation pending. Please wait a moment while your subscription activates.</span>
@@ -185,14 +212,29 @@ const PricingPage: React.FC<PricingPageProps> = ({
                     ? 'bg-gray-800 text-gray-400 border border-gray-700 cursor-not-allowed opacity-80'
                     : isProCard
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/25'
+                    : plan.id === 'enterprise'
+                    ? 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-lg hover:shadow-purple-500/25'
                     : 'bg-gray-700 text-white hover:bg-gray-600'
                 }`}
               >
-                {isProCard && (isProcessing || isProPending) && (
+                {((isProCard && (isProcessing || isProPending)) || (plan.id === 'enterprise' && (isProcessing || isEnterprisePending))) && (
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
                 )}
                 <span>{plan.buttonText}</span>
               </button>
+
+              {plan.id === 'enterprise' && !isEnterpriseActive && (
+                <div className="mt-3 text-center">
+                  <a
+                    href="mailto:sales@stratiq.ai?subject=StratIQ%20Team%20Scale%20Invoicing%20Inquiry"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors inline-block"
+                  >
+                    Need team invoice or GST billing? Contact Sales
+                  </a>
+                </div>
+              )}
             </div>
           );
         })}

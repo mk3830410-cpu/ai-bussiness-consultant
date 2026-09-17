@@ -189,11 +189,16 @@ app.post('/api/razorpay/create-subscription', async (req, res, next) => {
       });
     }
 
-    const proPlanId = process.env.RAZORPAY_PRO_PLAN_ID;
-    if (!proPlanId) {
+    const planType = (req.body?.planType === 'enterprise') ? 'enterprise' : 'pro';
+    const planEnvKey = planType === 'enterprise' ? 'RAZORPAY_TEAM_PLAN_ID' : 'RAZORPAY_PRO_PLAN_ID';
+    const planId = planType === 'enterprise' 
+      ? (process.env.RAZORPAY_TEAM_PLAN_ID || process.env.RAZORPAY_SCALE_PLAN_ID) 
+      : process.env.RAZORPAY_PRO_PLAN_ID;
+
+    if (!planId) {
       return res.status(500).json({
         success: false,
-        message: 'RAZORPAY_PRO_PLAN_ID is not configured in server environment.'
+        message: `${planEnvKey} is not configured in server environment. Please set it in Render to support ${planType === 'enterprise' ? 'Team Scale ($99/mo)' : 'Founder Pro ($29/mo)'}.`
       });
     }
 
@@ -203,35 +208,36 @@ app.post('/api/razorpay/create-subscription', async (req, res, next) => {
     const userData = userDoc.exists ? userDoc.data() : null;
     const existingSub = userData?.subscription;
 
-    // Check if already actively subscribed to Pro
-    if (existingSub && existingSub.plan === 'pro' && existingSub.status === 'active') {
+    // Check if already actively subscribed to this plan
+    if (existingSub && existingSub.plan === planType && existingSub.status === 'active') {
       return res.status(409).json({
         success: false,
         code: 'ALREADY_SUBSCRIBED',
-        message: 'You already have an active Pro subscription.'
+        message: `You already have an active ${planType === 'enterprise' ? 'Team Scale' : 'Founder Pro'} subscription.`
       });
     }
 
     // Create Razorpay Subscription with Firebase UID securely mapped in notes
     const subscriptionOptions = {
-      plan_id: proPlanId,
+      plan_id: planId,
       total_count: 12, // 12 monthly cycles
       quantity: 1,
       customer_notify: 1,
       notes: {
         firebase_uid: uid,
         email: decodedToken.email || '',
-        displayName: decodedToken.name || ''
+        displayName: decodedToken.name || '',
+        plan_type: planType
       }
     };
 
     const razorpaySubscription = await razorpay.subscriptions.create(subscriptionOptions);
-    console.log(`[StratIQ Backend] Created Razorpay Subscription: ${razorpaySubscription.id} for UID: ${uid}`);
+    console.log(`[StratIQ Backend] Created Razorpay Subscription: ${razorpaySubscription.id} (${planType}) for UID: ${uid}`);
 
-    // Store pending state in Firestore (pending != active, Pro features not granted)
+    // Store pending state in Firestore (pending != active, features not granted)
     await userDocRef.set({
       subscription: {
-        plan: 'pro',
+        plan: planType,
         status: 'pending',
         razorpaySubscriptionId: razorpaySubscription.id,
         razorpayPlanId: razorpaySubscription.plan_id,
@@ -241,6 +247,7 @@ app.post('/api/razorpay/create-subscription', async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
+      planType,
       subscriptionId: razorpaySubscription.id,
       keyId: process.env.RAZORPAY_KEY_ID
     });
@@ -291,22 +298,28 @@ app.post('/api/razorpay/verify', async (req, res, next) => {
 
     console.log(`[StratIQ Backend] Signature successfully verified for UID: ${uid}, Sub: ${razorpay_subscription_id}`);
 
-    // Update Firestore to active
+    // Read user document to preserve requested plan type or fallback to request body / default
     const userDocRef = db.collection('users').doc(uid);
+    const existingDoc = await userDocRef.get();
+    const existingData = existingDoc.exists ? existingDoc.data() : null;
+    const planType = req.body?.planType || existingData?.subscription?.plan || 'pro';
+
+    // Update Firestore to active
     await userDocRef.set({
       subscription: {
-        plan: 'pro',
+        plan: planType,
         status: 'active',
         razorpaySubscriptionId: razorpay_subscription_id,
         razorpayPaymentId: razorpay_payment_id,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       },
-      subscriptionPlan: 'pro' // For UI compatibility
+      subscriptionPlan: planType // For UI compatibility
     }, { merge: true });
 
     return res.status(200).json({
       success: true,
-      message: 'Payment verified and Founder Pro subscription activated successfully.'
+      planType,
+      message: `Payment verified and ${planType === 'enterprise' ? 'Team Scale ($99/mo)' : 'Founder Pro ($29/mo)'} subscription activated successfully.`
     });
   } catch (err) {
     next(err);
@@ -393,25 +406,31 @@ app.post('/api/razorpay/webhook', async (req, res) => {
           ? new Date(subscriptionEntity.current_end * 1000).toISOString() 
           : null;
 
+        const targetPlan = (
+          subscriptionEntity.notes?.plan_type === 'enterprise' || 
+          planId === process.env.RAZORPAY_TEAM_PLAN_ID || 
+          planId === process.env.RAZORPAY_SCALE_PLAN_ID
+        ) ? 'enterprise' : 'pro';
+
         switch (eventName) {
           case 'subscription.authenticated':
             await userDocRef.set({
               subscription: {
-                plan: 'pro',
+                plan: targetPlan,
                 status: 'pending',
                 razorpaySubscriptionId: subId,
                 razorpayPlanId: planId,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
               }
             }, { merge: true });
-            console.log(`[StratIQ Webhook] Handled subscription.authenticated for UID: ${targetUid}`);
+            console.log(`[StratIQ Webhook] Handled subscription.authenticated for UID: ${targetUid} (${targetPlan})`);
             break;
 
           case 'subscription.activated':
           case 'subscription.charged':
             await userDocRef.set({
               subscription: {
-                plan: 'pro',
+                plan: targetPlan,
                 status: 'active',
                 razorpaySubscriptionId: subId,
                 razorpayPlanId: planId,
@@ -419,24 +438,25 @@ app.post('/api/razorpay/webhook', async (req, res) => {
                 currentPeriodEnd: periodEnd,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
               },
-              subscriptionPlan: 'pro'
+              subscriptionPlan: targetPlan
             }, { merge: true });
-            console.log(`[StratIQ Webhook] Activated Pro subscription for UID: ${targetUid}`);
+            console.log(`[StratIQ Webhook] Activated ${targetPlan} subscription for UID: ${targetUid}`);
             break;
 
           case 'subscription.updated':
             await userDocRef.set({
               subscription: {
-                plan: 'pro',
+                plan: targetPlan,
                 status: subscriptionEntity.status === 'active' ? 'active' : subscriptionEntity.status,
                 razorpaySubscriptionId: subId,
                 razorpayPlanId: planId,
                 currentPeriodStart: periodStart,
                 currentPeriodEnd: periodEnd,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
-              }
+              },
+              subscriptionPlan: targetPlan
             }, { merge: true });
-            console.log(`[StratIQ Webhook] Updated subscription for UID: ${targetUid}`);
+            console.log(`[StratIQ Webhook] Updated ${targetPlan} subscription for UID: ${targetUid}`);
             break;
 
           case 'subscription.pending':

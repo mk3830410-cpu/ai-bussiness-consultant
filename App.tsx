@@ -342,7 +342,7 @@ const AppContent: React.FC = () => {
     }
   }, [refreshSubscription, showToast]);
 
-  const handleGetProSubscription = async () => {
+  const handleInitiateSubscription = async (planType: 'pro' | 'enterprise' = 'pro') => {
     if (!user) {
       setIntendedDestination('/pricing');
       setAuthModalMode('login');
@@ -352,8 +352,10 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    if (subscription?.plan === 'pro' && subscription?.status === 'active') {
-      showToast('You are already actively subscribed to Founder Pro!', 'info');
+    const planLabel = planType === 'enterprise' ? 'Team Scale ($99/mo)' : 'Founder Pro ($29/mo)';
+
+    if (subscription?.plan === planType && subscription?.status === 'active') {
+      showToast(`You are already actively subscribed to ${planLabel}!`, 'info');
       return;
     }
 
@@ -365,15 +367,15 @@ const AppContent: React.FC = () => {
         throw new Error('Could not load Razorpay payment SDK. Please check your internet connection and try again.');
       }
 
-      // 2. Call backend /api/razorpay/create-subscription
-      const createRes = await createProSubscription();
+      // 2. Call backend /api/razorpay/create-subscription with planType
+      const createRes = await createProSubscription(planType);
       if (!createRes.success) {
         if (createRes.code === 'ALREADY_SUBSCRIBED') {
-          showToast('You already have an active Pro subscription.', 'info');
+          showToast(`You already have an active ${planLabel} subscription.`, 'info');
           await refreshSubscription();
           return;
         }
-        throw new Error(createRes.message || 'Failed to initiate Founder Pro subscription.');
+        throw new Error(createRes.message || `Failed to initiate ${planLabel} subscription.`);
       }
 
       const subscriptionId = createRes.subscriptionId;
@@ -388,7 +390,7 @@ const AppContent: React.FC = () => {
         key: keyId,
         subscription_id: subscriptionId,
         name: 'StratIQ',
-        description: 'Founder Pro Subscription ($29/mo)',
+        description: `StratIQ ${planLabel} Subscription`,
         handler: async function (response: any) {
           setIsProcessingPro(true);
           try {
@@ -397,12 +399,13 @@ const AppContent: React.FC = () => {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_subscription_id: response.razorpay_subscription_id,
               razorpay_signature: response.razorpay_signature,
+              planType
             });
 
             if (verifyRes.success) {
               await refreshSubscription();
               await refreshProfile();
-              showToast('Founder Pro subscription activated successfully! Welcome to Pro.', 'success');
+              showToast(`${planLabel} subscription activated successfully! Welcome aboard.`, 'success');
               setCurrentTab('dashboard');
             } else {
               showToast(verifyRes.message || 'Payment verification failed. Please contact support.', 'error');
@@ -418,7 +421,7 @@ const AppContent: React.FC = () => {
           email: user.email || '',
         },
         theme: {
-          color: '#4f46e5',
+          color: planType === 'enterprise' ? '#7e22ce' : '#4f46e5',
         },
         modal: {
           ondismiss: function () {
@@ -431,11 +434,14 @@ const AppContent: React.FC = () => {
       rzp.open();
     } catch (err: any) {
       console.error('[StratIQ] Subscription error:', err);
-      showToast(err.message || 'Could not initiate subscription. Please try again.', 'error');
+      showToast(err.message || `Could not initiate ${planLabel} subscription.`, 'error');
     } finally {
       setIsProcessingPro(false);
     }
   };
+
+  const handleGetProSubscription = () => handleInitiateSubscription('pro');
+  const handleGetTeamScale = () => handleInitiateSubscription('enterprise');
 
   // Common handler after strategy generation
   const handleStrategyReceived = async (
@@ -953,10 +959,14 @@ const AppContent: React.FC = () => {
                 </p>
               </div>
               <PricingPage 
-                onSelectPlan={() => handleGetProSubscription()} 
+                onSelectPlan={(tier) => {
+                  if (tier === 'enterprise') handleGetTeamScale();
+                  else handleGetProSubscription();
+                }} 
                 subscription={subscription}
                 isProcessing={isProcessingPro}
                 onGetPro={handleGetProSubscription}
+                onGetTeamScale={handleGetTeamScale}
               />
             </div>
           )}

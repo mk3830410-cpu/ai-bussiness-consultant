@@ -45,8 +45,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onViewAllStrategies,
   onUpgradePro,
 }) => {
+  const isEnterpriseActive = subscription?.plan === 'enterprise' && subscription?.status === 'active';
   const isProActive = subscription?.plan === 'pro' && subscription?.status === 'active';
-  const isPending = subscription?.plan === 'pro' && subscription?.status === 'pending';
+  const isPending = (subscription?.plan === 'pro' || subscription?.plan === 'enterprise') && subscription?.status === 'pending';
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -94,31 +95,45 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <div className="bg-gray-800/80 border border-gray-700/80 rounded-2xl p-5 md:p-6 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
-            isProActive 
+            isEnterpriseActive
+              ? 'bg-purple-500/20 border border-purple-500/30 text-purple-400'
+              : isProActive 
               ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400' 
               : isPending 
               ? 'bg-amber-500/20 border border-amber-500/30 text-amber-400' 
               : 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-400'
           }`}>
-            {isProActive ? <ShieldCheck className="w-6 h-6" /> : isPending ? <Clock className="w-6 h-6 animate-pulse" /> : <Zap className="w-6 h-6" />}
+            {isEnterpriseActive ? (
+              <ShieldCheck className="w-6 h-6 text-purple-400" />
+            ) : isProActive ? (
+              <ShieldCheck className="w-6 h-6 text-emerald-400" />
+            ) : isPending ? (
+              <Clock className="w-6 h-6 animate-pulse" />
+            ) : (
+              <Zap className="w-6 h-6" />
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h4 className="text-base font-bold text-white">
-                {isProActive ? 'Founder Pro' : isPending ? 'Founder Pro' : 'Starter'}
+                {isEnterpriseActive ? 'Team Scale' : isProActive ? 'Founder Pro' : isPending ? 'Founder Pro' : 'Starter'}
               </h4>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                isProActive 
+                isEnterpriseActive
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  : isProActive 
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
                   : isPending 
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
                   : 'bg-slate-700 text-slate-300'
               }`}>
-                {isProActive ? 'Active' : isPending ? 'Payment Confirmation Pending' : 'Free Plan'}
+                {isEnterpriseActive ? 'Active (Team Scale)' : isProActive ? 'Active (Founder Pro)' : isPending ? 'Payment Confirmation Pending' : 'Free Plan'}
               </span>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              {isProActive 
+              {isEnterpriseActive
+                ? 'Full enterprise suite: Unlimited AI strategies, team collaboration seats, priority models & white-label reports.'
+                : isProActive 
                 ? 'Unlimited AI strategies, financial projections, 24/7 AI Advisor, and export tools enabled.'
                 : isPending 
                 ? 'Payment confirmation pending. Verifying subscription status with Razorpay...'
@@ -128,7 +143,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          {isProActive ? (
+          {(isProActive || isEnterpriseActive) ? (
             <button
               onClick={onUpgradePro}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5"
@@ -147,7 +162,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-indigo-500/20 flex items-center gap-2 transform hover:scale-105"
             >
               <Zap className="w-3.5 h-3.5 text-amber-300" />
-              <span>Upgrade to Founder Pro</span>
+              <span>Upgrade Plan</span>
             </button>
           )}
         </div>

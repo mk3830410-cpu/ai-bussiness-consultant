@@ -139,12 +139,13 @@ export function subscribeToUserSubscription(
 }
 
 /**
- * Call backend to create Razorpay subscription
+ * Call backend to create Razorpay subscription (pro $29/mo or enterprise $99/mo)
  */
-export async function createProSubscription(): Promise<{
+export async function createProSubscription(planType: 'pro' | 'enterprise' = 'pro'): Promise<{
   success: boolean;
   subscriptionId?: string;
   keyId?: string;
+  planType?: string;
   code?: string;
   message?: string;
 }> {
@@ -167,12 +168,15 @@ export async function createProSubscription(): Promise<{
     headers: {
       'Authorization': `Bearer ${idToken}`,
       'Content-Type': 'application/json'
-    }
+    },
+    body: JSON.stringify({ planType })
   });
 
   const data = await response.json();
   return data;
 }
+
+export const createSubscription = createProSubscription;
 
 /**
  * Verify payment on backend after Razorpay checkout returns payment IDs
@@ -181,7 +185,8 @@ export async function verifySubscriptionPayment(payload: {
   razorpay_payment_id: string;
   razorpay_subscription_id: string;
   razorpay_signature: string;
-}): Promise<{ success: boolean; message: string }> {
+  planType?: 'pro' | 'enterprise';
+}): Promise<{ success: boolean; message: string; planType?: string }> {
   const currentUser = auth.currentUser;
   if (!currentUser) {
     return { success: false, message: 'Authentication required.' };
