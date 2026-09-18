@@ -15,10 +15,12 @@ import {
   BarChart3,
   ShieldCheck,
   Clock,
-  ExternalLink
+  ExternalLink,
+  HelpCircle
 } from 'lucide-react';
 import { SavedStrategy, UserSubscription } from '../types';
 import { UserUsage } from '../subscriptionConfig';
+import { SUPPORT_EMAIL, createSupportMailto } from '../supportConfig';
 
 interface DashboardOverviewProps {
   stats: {
@@ -92,6 +94,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <Bot className="w-4 h-4 text-indigo-400" />
               <span>Chat with AI Co-Founder</span>
             </button>
+
+            <a
+              href={createSupportMailto('account')}
+              id="dashboard-need-help-btn"
+              className="px-5 py-3.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white font-semibold rounded-xl text-sm transition-all duration-200 flex items-center gap-2"
+              title={`Contact StratIQ support at ${SUPPORT_EMAIL}`}
+              aria-label="Need help? Contact support"
+            >
+              <HelpCircle className="w-4 h-4 text-indigo-400" />
+              <span>Need help?</span>
+            </a>
           </div>
         </div>
       </div>

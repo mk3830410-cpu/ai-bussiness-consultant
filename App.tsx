@@ -23,9 +23,13 @@ import { AuthProvider, useAuth } from './services/AuthContext';
 import { updateUserProfile } from './services/authService';
 import { OnboardingModal } from './components/OnboardingModal';
 import { trackEvent } from './services/analytics';
-import { Users, Sparkles, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Users, Sparkles, ArrowLeft, RefreshCw, BrainCircuit, Mail, MessageSquareHeart, HelpCircle, LifeBuoy } from 'lucide-react';
 import { TeamModal } from './components/CollaborationTools';
 import { ToastProvider, useToast } from './components/Toast';
+import { ThemeProvider } from './services/ThemeContext';
+import { FeedbackModal } from './components/FeedbackModal';
+import { SupportPage } from './components/SupportPage';
+import { SUPPORT_EMAIL, createSupportMailto } from './supportConfig';
 import { ConceptHistory } from './components/ConceptHistory';
 import { DashboardOverview } from './components/DashboardOverview';
 import { AnalysisWizard } from './components/AnalysisWizard';
@@ -101,6 +105,7 @@ const AppContent: React.FC = () => {
       case 'advisor': return '/ai-advisor';
       case 'settings': return '/settings';
       case 'pricing': return '/pricing';
+      case 'support': return '/support';
       default: return '/dashboard';
     }
   };
@@ -114,6 +119,7 @@ const AppContent: React.FC = () => {
     if (normalized === '/ai-advisor') return 'advisor';
     if (normalized === '/settings' || normalized === '/profile') return 'settings';
     if (normalized === '/pricing') return 'pricing';
+    if (normalized === '/support' || normalized === '/help') return 'support';
     return null;
   };
 
@@ -125,6 +131,9 @@ const AppContent: React.FC = () => {
     }
     return 'dashboard';
   });
+
+  // Feedback modal state
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState<boolean>(false);
 
   // Track intended protected destination for post-login redirect
   const [intendedDestination, setIntendedDestination] = useState<string | null>(null);
@@ -432,10 +441,45 @@ const AppContent: React.FC = () => {
               showToast(`${planLabel} subscription activated successfully! Welcome aboard.`, 'success');
               setCurrentTab('dashboard');
             } else {
-              showToast(verifyRes.message || 'Payment verification failed. Please contact support.', 'error');
+              showToast(
+                <div className="flex flex-col gap-1 text-xs text-left">
+                  <span className="font-semibold text-rose-200">Payment couldn't be completed. Please try again.</span>
+                  <div className="flex items-center gap-2 pt-1 border-t border-rose-500/20 mt-1">
+                    <span className="text-slate-300">If the issue continues:</span>
+                    <a
+                      href={createSupportMailto('payment')}
+                      className="text-xs font-bold text-indigo-300 hover:text-white underline inline-flex items-center gap-1"
+                    >
+                      <Mail size={12} />
+                      <span>Contact Support</span>
+                    </a>
+                  </div>
+                </div>,
+                'error',
+                'default',
+                7000
+              );
             }
           } catch (verifyErr: any) {
-            showToast('Error verifying payment: ' + (verifyErr.message || 'Unknown error'), 'error');
+            console.error('[StratIQ] Payment verification error:', verifyErr);
+            showToast(
+              <div className="flex flex-col gap-1 text-xs text-left">
+                <span className="font-semibold text-rose-200">Payment verification could not be completed. Your account was not charged.</span>
+                <div className="flex items-center gap-2 pt-1 border-t border-rose-500/20 mt-1">
+                  <span className="text-slate-300">Need help?</span>
+                  <a
+                    href={createSupportMailto('payment')}
+                    className="text-xs font-bold text-indigo-300 hover:text-white underline inline-flex items-center gap-1"
+                  >
+                    <Mail size={12} />
+                    <span>Contact Support</span>
+                  </a>
+                </div>
+              </div>,
+              'error',
+              'default',
+              7000
+            );
           } finally {
             setIsProcessingPro(false);
           }
@@ -458,7 +502,24 @@ const AppContent: React.FC = () => {
       rzp.open();
     } catch (err: any) {
       console.error('[StratIQ] Subscription error:', err);
-      showToast(err.message || `Could not initiate ${planLabel} subscription.`, 'error');
+      showToast(
+        <div className="flex flex-col gap-1 text-xs text-left">
+          <span className="font-semibold text-rose-200">Unable to initiate checkout. Please check your connection and try again.</span>
+          <div className="flex items-center gap-2 pt-1 border-t border-rose-500/20 mt-1">
+            <span className="text-slate-300">Questions?</span>
+            <a
+              href={createSupportMailto('payment')}
+              className="text-xs font-bold text-indigo-300 hover:text-white underline inline-flex items-center gap-1"
+            >
+              <Mail size={12} />
+              <span>Contact Support</span>
+            </a>
+          </div>
+        </div>,
+        'error',
+        'default',
+        7000
+      );
     } finally {
       setIsProcessingPro(false);
     }
@@ -1049,30 +1110,113 @@ const AppContent: React.FC = () => {
               }}
             />
           )}
+
+          {/* 8. HELP & SUPPORT */}
+          {currentTab === 'support' && (
+            <SupportPage 
+              onBack={() => setCurrentTab('dashboard')}
+              onOpenLogin={handleOpenLogin}
+            />
+          )}
         </main>
       </div>
 
-      <footer className="border-t border-slate-800 bg-slate-900/60 py-6 text-center text-xs text-slate-400 mt-12">
-        <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© {new Date().getFullYear()} StratIQ — AI Business Co-Founder. Connected to Firebase Firestore.</p>
-          <div className="flex items-center gap-4 text-xs">
-            <span>Powered by Gemini 2.5 Flash</span>
-            <span>•</span>
-            <span>Workspace: <span className="uppercase font-bold text-indigo-400">{currentPlan}</span></span>
+      {/* Modern SaaS Executive Footer with Support & Feedback */}
+      <footer className="border-t border-slate-800/80 bg-slate-950/80 backdrop-blur-md py-8 text-xs text-slate-400 mt-16 transition-colors">
+        <div className="container mx-auto px-4 max-w-7xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-slate-800/60">
+            {/* Left: Brand Identity */}
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-sm shadow-indigo-600/30">
+                <BrainCircuit className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="font-bold text-white text-sm tracking-tight">
+                  Strat<span className="text-indigo-400">IQ</span>
+                </span>
+                <p className="text-[11px] text-slate-500">Autonomous Venture Intelligence & Strategy</p>
+              </div>
+            </div>
+
+            {/* Middle: Support & Direct Mailto Section */}
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">Support:</span>
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('StratIQ Support — Account Help')}`}
+                  className="text-slate-300 hover:text-white font-semibold inline-flex items-center gap-1.5 transition-colors group"
+                  aria-label={`Email support at ${SUPPORT_EMAIL}`}
+                  title={`Send email to ${SUPPORT_EMAIL}`}
+                >
+                  <Mail className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  <span className="underline decoration-slate-700 hover:decoration-indigo-400 underline-offset-4">{SUPPORT_EMAIL}</span>
+                </a>
+              </div>
+
+              <span className="hidden sm:inline text-slate-700">•</span>
+
+              <button
+                type="button"
+                onClick={() => setCurrentTab('support')}
+                className="text-slate-400 hover:text-indigo-300 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <LifeBuoy className="w-3.5 h-3.5 text-slate-400" />
+                <span>Help Center & FAQ</span>
+              </button>
+
+              <span className="hidden sm:inline text-slate-700">•</span>
+
+              {/* Send Feedback Modal Trigger */}
+              <button
+                type="button"
+                id="footer-send-feedback-btn"
+                onClick={() => setIsFeedbackOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 border border-indigo-500/30 transition-all font-medium cursor-pointer shadow-sm"
+                title="Send qualitative feedback on AI strategies"
+              >
+                <MessageSquareHeart className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Send Feedback</span>
+              </button>
+            </div>
+
+            {/* Right: Workspace Tier & AI Model */}
+            <div className="flex items-center gap-3 text-[11px] text-slate-500">
+              <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
+                Gemini 2.5 Flash
+              </span>
+              <span>
+                Plan: <span className="uppercase font-bold text-indigo-400">{currentPlan}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Bottom Copyright */}
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+            <p>© {new Date().getFullYear()} StratIQ — AI Business Co-Founder. Connected to Firebase Firestore.</p>
+            <p className="text-slate-600">Enterprise Grade Encryption • PCI-DSS Compliant</p>
           </div>
         </div>
       </footer>
+
+      {/* Qualitative Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        strategyName={activeStrategy?.title || analysisResult?.brandIdentity?.companyNameSuggestions?.[0] || currentWizardData?.businessIdea || ''}
+      />
     </div>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 };
 

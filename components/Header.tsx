@@ -19,11 +19,15 @@ import {
   Zap,
   TrendingUp,
   Clock,
-  ChevronDown
+  ChevronDown,
+  Sun,
+  Moon,
+  LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '../services/AuthContext';
+import { useTheme } from '../services/ThemeContext';
 
-export type AppNavTab = 'dashboard' | 'new_analysis' | 'saved_strategies' | 'ideas_vault' | 'advisor' | 'pricing' | 'settings';
+export type AppNavTab = 'dashboard' | 'new_analysis' | 'saved_strategies' | 'ideas_vault' | 'advisor' | 'pricing' | 'settings' | 'support';
 
 export interface HeaderProps {
   currentTab?: AppNavTab;
@@ -59,6 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
   isVerified,
 }) => {
   const { user, authLoading, logout, isEmailVerified, isPro, subscription } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const isEnterprise = subscription?.plan === 'enterprise' && subscription?.status === 'active';
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -308,6 +313,17 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </div>
 
+              {/* Theme Toggle Shortcut */}
+              <button
+                id="header-theme-toggle-btn"
+                onClick={toggleTheme}
+                aria-label={isDark ? "Switch to Light theme" : "Switch to Dark theme"}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/70 border border-slate-800/80 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              >
+                {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+              </button>
+
               {/* Quick Settings Shortcut */}
               <button
                 id="header-settings-button"
@@ -391,6 +407,32 @@ export const Header: React.FC<HeaderProps> = ({
                       >
                         <CreditCard size={14} className="text-slate-400" />
                         <span>Subscription Plan</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          onSelectTab?.('support');
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 transition-colors cursor-pointer"
+                      >
+                        <LifeBuoy size={14} className="text-slate-400" />
+                        <span>Help & Support</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          toggleTheme();
+                        }}
+                        className="w-full text-left flex items-center justify-between px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {isDark ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-indigo-400" />}
+                          <span>Appearance</span>
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold uppercase">
+                          {isDark ? 'Dark' : 'Light'}
+                        </span>
                       </button>
                     </div>
 
@@ -525,8 +567,18 @@ export const Header: React.FC<HeaderProps> = ({
             ))}
           </nav>
 
-          {/* Right Side: Log In & Get Started */}
+          {/* Right Side: Theme Switcher, Log In & Get Started */}
           <div className="hidden md:flex items-center gap-3">
+            <button
+              id="header-public-theme-toggle"
+              onClick={toggleTheme}
+              aria-label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/70 border border-slate-800/80 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+            </button>
+
             <button
               onClick={onOpenLogin}
               className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all cursor-pointer"
@@ -543,13 +595,22 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Mobile Hamburger for Public */}
-          <button
-            onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-            aria-label="Toggle navigation menu"
-            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            {isMobileNavOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              aria-label="Toggle Theme"
+              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              {isDark ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-400" />}
+            </button>
+            <button
+              onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+              aria-label="Toggle navigation menu"
+              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              {isMobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Dropdown for Public Visitor */}

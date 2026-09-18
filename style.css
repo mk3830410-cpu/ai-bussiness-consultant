@@ -59,3 +59,207 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* ============================================================
+   LIGHT THEME ACCESSIBILITY & CONTRAST
+   ============================================================ */
+html.light,
+body.light {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Light mode card and panel backgrounds */
+html.light .bg-slate-950,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/85,
+html.light .bg-slate-950\/90,
+html.light .bg-slate-900,
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/60,
+html.light .bg-gray-950,
+html.light .bg-gray-900,
+html.light .bg-gray-900\/90,
+html.light .bg-gray-900\/80 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light .bg-slate-950\/60,
+html.light .bg-slate-900\/50,
+html.light .bg-slate-800,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/70,
+html.light .bg-slate-800\/80,
+html.light .bg-gray-800,
+html.light .bg-gray-800\/80,
+html.light .bg-gray-800\/90 {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+/* Light mode borders */
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-800\/90,
+html.light .border-slate-800\/60,
+html.light .border-slate-700,
+html.light .border-slate-700\/80,
+html.light .border-gray-800,
+html.light .border-gray-800\/80,
+html.light .border-gray-700 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Light mode text contrast */
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-gray-100,
+html.light .text-gray-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300,
+html.light .text-slate-400,
+html.light .text-gray-300,
+html.light .text-gray-400 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-500,
+html.light .text-gray-500 {
+  color: #64748b !important;
+}
+
+/* Header & navigation in light theme */
+html.light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Light mode inputs, textareas, and select menus */
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Scrollbar for light mode */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ============================================================
+   DEDICATED PRINT STYLESHEET
+   Clean output for generated business strategies & blueprints
+   ============================================================ */
+@media print {
+  @page {
+    margin: 15mm 15mm 15mm 15mm;
+    size: auto;
+  }
+
+  html,
+  body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Completely eliminate UI navigation, headers, footers, toolbars, and buttons */
+  header,
+  nav,
+  aside,
+  footer,
+  button,
+  .no-print,
+  #header-nav-center,
+  #header-right-actions,
+  #toast-container,
+  #dashboard-need-help-btn,
+  .print-hidden,
+  [role="dialog"] > div:first-child:not(#print-preview-content):not(.printable-content) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Ensure the printable content or strategy report fills the page cleanly */
+  #print-preview-content,
+  .printable-content,
+  .printable-strategy {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Typography formatting for clean physical paper printing */
+  h1, h2, h3, h4, h5, h6 {
+    color: #1e1b4b !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  p, li, dl {
+    color: #1e293b !important;
+  }
+
+  /* Page-break avoidance on critical sections */
+  .break-inside-avoid,
+  .accordion-section,
+  .print-avoid-break,
+  table,
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Avoid isolated orphan/widow lines */
+  p, blockquote {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Table borders in print */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 8px 12px !important;
+  }
+}
+

@@ -113,14 +113,14 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn overflow-y-auto print:p-0 print:static print:bg-white"
       role="dialog"
       aria-modal="true"
       aria-labelledby="print-preview-title"
     >
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden text-slate-100">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden text-slate-100 print:bg-white print:border-none print:shadow-none print:max-w-full print:max-h-none print:overflow-visible">
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-900 shrink-0">
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-900 shrink-0 no-print">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
               <Printer className="w-5 h-5" />
@@ -188,9 +188,9 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
         </div>
 
         {/* Content Layout: Left Settings, Right Document Preview */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden print:overflow-visible">
           {/* Controls Sidebar */}
-          <div className="w-full md:w-72 bg-slate-900/90 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto space-y-5 shrink-0 text-xs">
+          <div className="w-full md:w-72 bg-slate-900/90 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto space-y-5 shrink-0 text-xs no-print">
             {/* Page Format Controls */}
             <div>
               <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
@@ -365,10 +365,10 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
           </div>
 
           {/* Document Preview Canvas (Styled like real print paper) */}
-          <div className="flex-1 overflow-auto p-4 sm:p-8 bg-slate-950/60 flex justify-center">
+          <div className="flex-1 overflow-auto p-4 sm:p-8 bg-slate-950/60 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
             <div 
               id="print-preview-content"
-              className={`w-full max-w-3xl bg-white text-slate-900 rounded-lg shadow-2xl transition-all ${marginClasses} ${
+              className={`w-full max-w-3xl bg-white text-slate-900 rounded-lg shadow-2xl transition-all print:shadow-none print:max-w-full print:rounded-none print:p-0 ${marginClasses} ${
                 orientation === 'landscape' ? 'max-w-4xl' : ''
               }`}
               style={{
