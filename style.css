@@ -61,86 +61,499 @@ body {
 }
 
 /* ============================================================
-   LIGHT THEME ACCESSIBILITY & CONTRAST
+   SMOOTH THEME TRANSITION SYSTEM
+   Seamless, professional interpolation between Dark and Light
    ============================================================ */
+html,
+body,
+#root,
+header,
+footer,
+nav,
+aside,
+main,
+section,
+article,
+dialog,
+[role="dialog"],
+[role="dialog"] > div,
+.theme-transition,
+.theme-transition *,
+div[class*="bg-slate-"],
+div[class*="bg-gray-"],
+div[class*="bg-zinc-"],
+div[class*="border-slate-"],
+div[class*="border-gray-"],
+div[class*="border-zinc-"],
+header *,
+footer *,
+nav *,
+aside *,
+button,
+input,
+textarea,
+select,
+span[class*="text-"],
+span[class*="bg-"],
+p,
+h1, h2, h3, h4, h5, h6,
+svg,
+svg text,
+svg line,
+svg path,
+svg circle,
+svg rect {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow, outline-color;
+  transition-duration: 350ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Accessibility: respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  #root,
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   LIGHT THEME ACCESSIBILITY & FULL COLOR PALETTE SUPPORT
+   ============================================================ */
+:root {
+  --bg-app: #020617;
+  --bg-card: #0f172a;
+  --bg-card-subtle: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-subtle: #334155;
+}
+
 html.light,
-body.light {
+body.light,
+[data-theme="light"] {
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f1f5f9;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-subtle: #e2e8f0;
   background-color: #f8fafc !important;
   color: #0f172a !important;
 }
 
 /* Light mode card and panel backgrounds */
 html.light .bg-slate-950,
-html.light .bg-slate-950\/80,
-html.light .bg-slate-950\/85,
+html.light .bg-slate-950\/95,
 html.light .bg-slate-950\/90,
+html.light .bg-slate-950\/85,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/70,
 html.light .bg-slate-900,
+html.light .bg-slate-900\/95,
 html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/85,
 html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/70,
 html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/50,
 html.light .bg-gray-950,
 html.light .bg-gray-900,
+html.light .bg-gray-900\/95,
 html.light .bg-gray-900\/90,
-html.light .bg-gray-900\/80 {
+html.light .bg-gray-900\/80,
+html.light .bg-gray-900\/70,
+html.light .bg-zinc-950,
+html.light .bg-zinc-900 {
   background-color: #ffffff !important;
   color: #0f172a !important;
 }
 
+/* Sub-panels, secondary containers, and chips */
 html.light .bg-slate-950\/60,
-html.light .bg-slate-900\/50,
+html.light .bg-slate-900\/40,
+html.light .bg-slate-900\/30,
 html.light .bg-slate-800,
-html.light .bg-slate-800\/60,
-html.light .bg-slate-800\/70,
+html.light .bg-slate-800\/90,
 html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/70,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/50,
 html.light .bg-gray-800,
+html.light .bg-gray-800\/90,
 html.light .bg-gray-800\/80,
-html.light .bg-gray-800\/90 {
+html.light .bg-gray-800\/70,
+html.light .bg-gray-800\/60,
+html.light .bg-gray-800\/50,
+html.light .bg-gray-800\/40,
+html.light .bg-gray-800\/30,
+html.light .bg-zinc-800 {
   background-color: #f1f5f9 !important;
   color: #1e293b !important;
 }
 
-/* Light mode borders */
-html.light .border-slate-800,
-html.light .border-slate-800\/80,
-html.light .border-slate-800\/90,
-html.light .border-slate-800\/60,
-html.light .border-slate-700,
-html.light .border-slate-700\/80,
-html.light .border-gray-800,
-html.light .border-gray-800\/80,
-html.light .border-gray-700 {
-  border-color: #e2e8f0 !important;
-}
-
-/* Light mode text contrast */
-html.light .text-white {
+/* Tertiary bars, badges and dividers */
+html.light .bg-slate-700,
+html.light .bg-slate-700\/80,
+html.light .bg-slate-700\/60,
+html.light .bg-slate-700\/50,
+html.light .bg-gray-700,
+html.light .bg-gray-700\/80,
+html.light .bg-gray-700\/60,
+html.light .bg-gray-700\/50,
+html.light .bg-zinc-700 {
+  background-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
 
+/* Root App container background */
+html.light .min-h-screen.bg-slate-950,
+html.light .min-h-screen.bg-gray-900,
+html.light .min-h-screen.bg-black {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Light mode hover state adaptations */
+html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-gray-800:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .hover\:bg-slate-900:hover,
+html.light .hover\:bg-gray-900:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .hover\:bg-gray-700:hover,
+html.light .hover\:bg-slate-700:hover {
+  background-color: #cbd5e1 !important;
+}
+
+/* Light mode borders */
+html.light .border-slate-800,
+html.light .border-slate-800\/90,
+html.light .border-slate-800\/80,
+html.light .border-slate-800\/70,
+html.light .border-slate-800\/60,
+html.light .border-slate-800\/50,
+html.light .border-slate-800\/40,
+html.light .border-slate-700,
+html.light .border-slate-700\/90,
+html.light .border-slate-700\/80,
+html.light .border-slate-700\/60,
+html.light .border-slate-700\/50,
+html.light .border-gray-800,
+html.light .border-gray-800\/90,
+html.light .border-gray-800\/80,
+html.light .border-gray-800\/70,
+html.light .border-gray-700,
+html.light .border-gray-700\/90,
+html.light .border-gray-700\/80,
+html.light .border-gray-700\/60,
+html.light .border-gray-700\/50,
+html.light .border-zinc-800,
+html.light .border-zinc-700 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .divide-slate-800 > * + *,
+html.light .divide-gray-800 > * + *,
+html.light .divide-slate-700 > * + *,
+html.light .divide-gray-700 > * + * {
+  border-color: #e2e8f0 !important;
+}
+
+/* Light mode text contrast on card surfaces and headings */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: #0f172a;
+}
+
+/* Light mode text utilities on light surfaces */
 html.light .text-slate-100,
 html.light .text-slate-200,
 html.light .text-gray-100,
-html.light .text-gray-200 {
-  color: #1e293b !important;
+html.light .text-gray-200,
+html.light .text-zinc-100,
+html.light .text-zinc-200 {
+  color: #0f172a !important;
 }
 
 html.light .text-slate-300,
-html.light .text-slate-400,
 html.light .text-gray-300,
-html.light .text-gray-400 {
+html.light .text-zinc-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400,
+html.light .text-gray-400,
+html.light .text-zinc-400 {
   color: #475569 !important;
 }
 
 html.light .text-slate-500,
-html.light .text-gray-500 {
+html.light .text-gray-500,
+html.light .text-zinc-500 {
   color: #64748b !important;
 }
 
-/* Header & navigation in light theme */
+/* Standalone text-white on light surfaces */
+html.light .text-white:not(button):not(button *):not([class*="bg-indigo-6"]):not([class*="bg-indigo-5"]):not([class*="bg-purple-6"]):not([class*="bg-emerald-6"]):not([class*="bg-rose-6"]):not([class*="from-indigo-6"]):not([class*="from-purple-6"]):not([class*="bg-slate-900"]):not(.pitch-slide-title):not(.presentation-white) {
+  color: #0f172a;
+}
+
+/* Accordion buttons, disclosure triggers, card buttons and outline buttons in light mode must show dark text */
+html.light button:not([class*="bg-indigo-6"]):not([class*="bg-indigo-5"]):not([class*="bg-indigo-7"]):not([class*="bg-purple-6"]):not([class*="bg-purple-5"]):not([class*="bg-emerald-6"]):not([class*="bg-rose-6"]):not([class*="bg-red-6"]):not([class*="from-purple"]):not([class*="from-indigo"]):not([class*="from-emerald"]):not([class*="from-rose"]) .text-white,
+html.light button:not([class*="bg-indigo-6"]):not([class*="bg-indigo-5"]):not([class*="bg-indigo-7"]):not([class*="bg-purple-6"]):not([class*="bg-purple-5"]):not([class*="bg-emerald-6"]):not([class*="bg-rose-6"]):not([class*="bg-red-6"]):not([class*="from-purple"]):not([class*="from-indigo"]):not([class*="from-emerald"]):not([class*="from-rose"]).text-white,
+html.light [id*="faq"] button span,
+html.light [aria-expanded] span {
+  color: #0f172a !important;
+}
+
+/* Saturated buttons and badges MUST retain crisp white text and white icons */
+html.light button.bg-indigo-600,
+html.light button.bg-indigo-600 *,
+html.light button.bg-indigo-500,
+html.light button.bg-indigo-500 *,
+html.light button.bg-indigo-700,
+html.light button.bg-indigo-700 *,
+html.light button.bg-purple-600,
+html.light button.bg-purple-600 *,
+html.light button.bg-emerald-600,
+html.light button.bg-emerald-600 *,
+html.light button.bg-rose-600,
+html.light button.bg-rose-600 *,
+html.light .bg-indigo-600,
+html.light .bg-indigo-600 *,
+html.light .bg-indigo-500,
+html.light .bg-indigo-500 *,
+html.light .bg-purple-600,
+html.light .bg-purple-600 *,
+html.light .bg-emerald-600,
+html.light .bg-emerald-600 *,
+html.light .bg-rose-600,
+html.light .bg-rose-600 *,
+html.light [class*="bg-gradient-to"][class*="from-indigo"] *,
+html.light [class*="bg-gradient-to"][class*="from-purple"] * {
+  color: #ffffff !important;
+}
+
+/* Light mode tint backgrounds for badges, alerts and status pills (exclude absolute decorative blurs) */
+html.light [class*="bg-indigo-950"]:not(.absolute),
+html.light [class*="bg-indigo-500\/10"]:not(.absolute):not([class*="blur"]),
+html.light [class*="bg-indigo-500\/20"]:not(.absolute):not([class*="blur"]) {
+  background-color: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #4338ca !important;
+}
+
+html.light [class*="bg-purple-950"]:not(.absolute),
+html.light [class*="bg-purple-500\/10"]:not(.absolute):not([class*="blur"]),
+html.light [class*="bg-purple-500\/20"]:not(.absolute):not([class*="blur"]) {
+  background-color: #f5f3ff !important;
+  border-color: #ddd6fe !important;
+  color: #6d28d9 !important;
+}
+
+html.light [class*="bg-emerald-950"]:not(.absolute),
+html.light [class*="bg-emerald-500\/10"]:not(.absolute):not([class*="blur"]),
+html.light [class*="bg-emerald-500\/20"]:not(.absolute):not([class*="blur"]) {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #047857 !important;
+}
+
+html.light [class*="bg-amber-950"]:not(.absolute),
+html.light [class*="bg-amber-500\/10"]:not(.absolute):not([class*="blur"]),
+html.light [class*="bg-amber-500\/20"]:not(.absolute):not([class*="blur"]) {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+
+/* Ambient glow accent moderation in light mode - keep them translucent, never opaque slabs */
+html.light .absolute[class*="bg-indigo-500"],
+html.light .absolute[class*="bg-purple-500"],
+html.light .absolute[class*="bg-emerald-500"],
+html.light .absolute[class*="bg-blue-500"] {
+  opacity: 0.25 !important;
+  background-color: rgba(99, 102, 241, 0.12) !important;
+}
+
+html.light [class*="bg-rose-950"],
+html.light [class*="bg-rose-500\/10"],
+html.light [class*="bg-rose-500\/20"] {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+}
+
+html.light [class*="bg-sky-950"],
+html.light [class*="bg-sky-500\/10"],
+html.light [class*="bg-sky-500\/20"] {
+  background-color: #f0f9ff !important;
+  border-color: #bae6fd !important;
+  color: #0369a1 !important;
+}
+
+/* Light mode vibrant icon color mappings for crisp AA contrast */
+html.light .text-indigo-400 {
+  color: #4f46e5 !important;
+}
+html.light .text-indigo-300 {
+  color: #4338ca !important;
+}
+html.light .text-purple-400 {
+  color: #7c3aed !important;
+}
+html.light .text-purple-300 {
+  color: #6d28d9 !important;
+}
+html.light .text-emerald-400 {
+  color: #059669 !important;
+}
+html.light .text-emerald-300 {
+  color: #047857 !important;
+}
+html.light .text-green-400 {
+  color: #16a34a !important;
+}
+html.light .text-green-500 {
+  color: #15803d !important;
+}
+html.light .text-amber-400 {
+  color: #b45309 !important;
+}
+html.light .text-amber-300 {
+  color: #92400e !important;
+}
+html.light .text-amber-500 {
+  color: #78350f !important;
+}
+html.light .text-yellow-400 {
+  color: #a16207 !important;
+}
+html.light .text-yellow-500 {
+  color: #854d0e !important;
+}
+html.light .text-sky-400 {
+  color: #0284c7 !important;
+}
+html.light .text-sky-300 {
+  color: #0369a1 !important;
+}
+html.light .text-blue-400 {
+  color: #2563eb !important;
+}
+html.light .text-cyan-400 {
+  color: #0891b2 !important;
+}
+html.light .text-teal-400 {
+  color: #0d9488 !important;
+}
+html.light .text-rose-400 {
+  color: #e11d48 !important;
+}
+html.light .text-rose-300 {
+  color: #be123c !important;
+}
+html.light .text-red-400 {
+  color: #dc2626 !important;
+}
+
+/* Background Images, Avatars, and Logos contrast on light surfaces */
+html.light img[alt*="Avatar"],
+html.light img[alt*="Logo"],
+html.light img[alt*="Generated Logo"],
+html.light img[alt*="Company Logo"] {
+  border-color: #cbd5e1 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Visual overlays & background image protection in light mode */
+html.light [style*="background-image"]:not([class*="from-"]):not([class*="to-"]) {
+  filter: contrast(1.05);
+}
+
+html.light div[style*="radial-gradient"] {
+  opacity: 0.65;
+  filter: saturate(1.2);
+}
+
+/* Ambient glow accent moderation in light mode */
+html.light [class*="bg-indigo-600\/10"],
+html.light [class*="bg-indigo-600\/15"],
+html.light [class*="bg-purple-600\/10"],
+html.light [class*="bg-purple-600\/15"] {
+  opacity: 0.45 !important;
+}
+
+/* Landing Page & Hero text gradient in light mode */
+html.light .from-white.to-gray-300 {
+  --tw-gradient-from: #0f172a var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: #334155 var(--tw-gradient-to-position) !important;
+}
+
+/* D3 and SVG charts readability in light mode */
+html.light svg text {
+  fill: #475569 !important;
+}
+html.light svg line,
+html.light svg path.domain {
+  stroke: #cbd5e1 !important;
+}
+
+/* Modal Dialogs in light mode */
+html.light [role="dialog"] > div {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Gradients in light theme */
+html.light .from-slate-900,
+html.light .from-slate-950,
+html.light .from-gray-900,
+html.light .from-gray-950 {
+  --tw-gradient-from: #ffffff var(--tw-gradient-from-position) !important;
+}
+
+html.light .to-slate-900,
+html.light .to-slate-950,
+html.light .to-slate-800,
+html.light .to-gray-900,
+html.light .to-gray-800,
+html.light .to-gray-700 {
+  --tw-gradient-to: #f1f5f9 var(--tw-gradient-to-position) !important;
+}
+
+html.light .via-indigo-950\/30,
+html.light .via-purple-950\/30,
+html.light .via-gray-900 {
+  --tw-gradient-stops: var(--tw-gradient-from), #f8fafc var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+/* Header, navigation & dropdowns in light theme */
 html.light header {
   background-color: rgba(255, 255, 255, 0.95) !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light footer {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
 }
 
 /* Light mode inputs, textareas, and select menus */
@@ -150,6 +563,12 @@ html.light select {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border-color: #cbd5e1 !important;
+}
+
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #6366f1 !important;
 }
 
 html.light input::placeholder,
@@ -170,7 +589,7 @@ html.light ::-webkit-scrollbar-thumb:hover {
 
 /* ============================================================
    DEDICATED PRINT STYLESHEET
-   Clean output for generated business strategies & blueprints
+   Clean output for generated business strategies & reports
    ============================================================ */
 @media print {
   @page {
@@ -197,10 +616,18 @@ html.light ::-webkit-scrollbar-thumb:hover {
   .no-print,
   #header-nav-center,
   #header-right-actions,
-  #toast-container,
+  #header-brand-logo,
+  #theme-toggle-btn,
+  #header-theme-toggle-btn,
+  #mobile-theme-toggle-btn,
+  #notifications-button,
+  #user-profile-button,
+  #footer-send-feedback-btn,
   #dashboard-need-help-btn,
+  #toast-container,
+  .toast,
   .print-hidden,
-  [role="dialog"] > div:first-child:not(#print-preview-content):not(.printable-content) {
+  [role="dialog"]:not(#print-report-modal) > div:first-child:not(#print-preview-content):not(.printable-content) {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
@@ -210,8 +637,10 @@ html.light ::-webkit-scrollbar-thumb:hover {
 
   /* Ensure the printable content or strategy report fills the page cleanly */
   #print-preview-content,
+  #printable-report,
   .printable-content,
-  .printable-strategy {
+  .printable-strategy,
+  [data-printable="true"] {
     display: block !important;
     position: static !important;
     width: 100% !important;

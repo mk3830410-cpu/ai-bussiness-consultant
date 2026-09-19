@@ -276,3 +276,179 @@ export interface BusinessIdeaItem {
   updatedAt?: number;
   status?: BusinessIdeaStatus;
 }
+
+// ==========================================
+// BUILD MY BUSINESS (10-STAGE EXECUTION ENGINE)
+// ==========================================
+
+export type BuildStageId = 
+  | 'validation'
+  | 'customer'
+  | 'business_model'
+  | 'pricing'
+  | 'brand'
+  | 'marketing'
+  | 'operations'
+  | 'launch'
+  | 'customers'
+  | 'growth';
+
+export type BuildStageStatus = 'not_started' | 'in_progress' | 'completed';
+
+export interface ValidationStageData {
+  problemHypothesis: string;
+  solutionHypothesis: string;
+  targetMarketSize: string;
+  riskiestAssumptions: { assumption: string; riskLevel: 'High' | 'Medium' | 'Low'; validationMethod: string }[];
+  experiments: { name: string; type: string; metric: string; target: string; status: 'planned' | 'running' | 'validated' | 'invalidated' }[];
+  customerInterviewQuestions: string[];
+  validationScore: number;
+  killCriteria: string;
+}
+
+export interface CustomerStageData {
+  idealCustomerProfile: {
+    segment: string;
+    demographics: string;
+    role: string;
+    dayInTheLife: string;
+    currentWorkaround: string;
+  };
+  topPainPoints: { pain: string; severity: number; frequency: string; willingnessToPay: string }[];
+  buyingTriggers: string[];
+  decisionCriteria: string[];
+  antiPersona: { whoNotToSellTo: string; reason: string };
+}
+
+export interface BusinessModelStageData {
+  valueProposition: string;
+  unfairAdvantage: string;
+  keyActivities: string[];
+  keyPartners: string[];
+  costStructure: { category: string; estimatedMonthly: number }[];
+  revenueStreams: { stream: string; model: string; projectedShare: number }[];
+  unitEconomics: {
+    arpuMonthly: number;
+    cacEstimated: number;
+    ltvMonths: number;
+    grossMarginPercent: number;
+  };
+}
+
+export interface PricingStageData {
+  valueMetric: string;
+  strategyType: 'value-based' | 'competitive' | 'cost-plus' | 'freemium';
+  tiers: {
+    name: string;
+    priceMonthly: number;
+    priceAnnual: number;
+    targetBuyer: string;
+    coreFeatures: string[];
+    isPopular?: boolean;
+  }[];
+  discountStrategy: string;
+  breakEvenMonthlyUnits: number;
+  marginSafetyBuffer: string;
+}
+
+export interface BrandStageData {
+  brandName: string;
+  tagline: string;
+  positioningStatement: string;
+  brandVoiceTone: string[];
+  coreValues: string[];
+  visualIdentity: {
+    primaryColor: string;
+    secondaryColor: string;
+    fontPairing: string;
+    aestheticVibe: string;
+  };
+  elevatorPitch30s: string;
+}
+
+export interface MarketingStageData {
+  primaryChannels: { channel: string; priority: 'Primary' | 'Secondary' | 'Testing'; expectedCAC: string; tactic: string }[];
+  contentPillars: { pillar: string; cadence: string; exampleTopic: string }[];
+  acquisitionFunnel: {
+    topOfFunnelLeadMagnet: string;
+    middleOfFunnelNurture: string;
+    bottomOfFunnelConversionCTA: string;
+  };
+  thirtyDayContentSchedule: { week: number; focus: string; contentHooks: string[] }[];
+}
+
+export interface OperationsStageData {
+  techStack: { category: string; toolName: string; purpose: string; monthlyCost: number }[];
+  legalReadiness: { item: string; completed: boolean; notes: string }[];
+  founderWeeklyCadence: { day: string; coreFocus: string }[];
+  keySOPs: { title: string; trigger: string; steps: string[] }[];
+}
+
+export interface LaunchStageData {
+  targetLaunchDate: string;
+  preLaunchWaitlistGoal: number;
+  countdownChecklist: { timing: 'T-14' | 'T-7' | 'T-1' | 'Launch Day' | 'T+3'; task: string; completed: boolean }[];
+  distributionKit: {
+    productHuntTagline: string;
+    productHuntMakerComment: string;
+    twitterAnnouncementThread: string;
+    linkedInPostDraft: string;
+  };
+}
+
+export interface CustomersStageData {
+  first10CustomersTarget: string;
+  first100CustomersStrategy: string;
+  coldOutreachTemplates: {
+    channel: 'Cold Email' | 'LinkedIn DM' | 'Community Forum';
+    subject?: string;
+    body: string;
+  }[];
+  objectionPlaybook: { objection: string; counterArgument: string }[];
+}
+
+export interface GrowthStageData {
+  northStarMetric: string;
+  pirateMetricsTargets: {
+    acquisitionGoal: string;
+    activationBenchmark: string;
+    retentionMonth1Percent: number;
+    referralKFactor: number;
+    revenueMRRTarget: number;
+  };
+  viralReferralEngine: { incentive: string; loopMechanism: string };
+  retentionCadence: { milestone: string; engagementAction: string }[];
+}
+
+export interface BuildStageDefinition {
+  id: BuildStageId;
+  stageNumber: string;
+  title: string;
+  subtitle: string;
+  category: 'Strategic' | 'Tactical' | 'Execution';
+  outputName: string;
+}
+
+export interface BuildMyBusinessRoadmap {
+  id: string;
+  userId: string;
+  ventureName: string;
+  industry: string;
+  stageSummary: string;
+  createdAt: number;
+  updatedAt: number;
+  completedStages: BuildStageId[];
+  activeStageId: BuildStageId;
+  stages: {
+    validation: { status: BuildStageStatus; data: ValidationStageData; generatedOutput?: string };
+    customer: { status: BuildStageStatus; data: CustomerStageData; generatedOutput?: string };
+    business_model: { status: BuildStageStatus; data: BusinessModelStageData; generatedOutput?: string };
+    pricing: { status: BuildStageStatus; data: PricingStageData; generatedOutput?: string };
+    brand: { status: BuildStageStatus; data: BrandStageData; generatedOutput?: string };
+    marketing: { status: BuildStageStatus; data: MarketingStageData; generatedOutput?: string };
+    operations: { status: BuildStageStatus; data: OperationsStageData; generatedOutput?: string };
+    launch: { status: BuildStageStatus; data: LaunchStageData; generatedOutput?: string };
+    customers: { status: BuildStageStatus; data: CustomersStageData; generatedOutput?: string };
+    growth: { status: BuildStageStatus; data: GrowthStageData; generatedOutput?: string };
+  };
+}

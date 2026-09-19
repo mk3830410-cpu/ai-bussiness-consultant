@@ -54,6 +54,11 @@ service cloud.firestore {
       match /usage/{usageId} {
         allow read, write: if isOwner(userId);
       }
+
+      // User buildRoadmaps subcollection (Build My Business 10-Stage Execution)
+      match /buildRoadmaps/{roadmapId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // Shared strategies

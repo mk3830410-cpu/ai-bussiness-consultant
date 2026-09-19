@@ -315,38 +315,38 @@ const LandingPage: React.FC<LandingPageProps> = ({
         {/* Pricing/CTA Section */}
         <section id="pricing" className="py-20 text-center relative">
           <div className="container mx-auto px-4 max-w-4xl">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 md:p-12 border border-gray-700/50 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -translate-y-16 translate-x-16" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/10 rounded-full -translate-x-12 translate-y-12" />
+            <div className="bg-gradient-to-br from-white via-indigo-50/40 to-purple-50/30 dark:from-gray-900 dark:to-gray-800 rounded-3xl p-8 md:p-12 border border-slate-200 dark:border-gray-700/50 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-16 translate-x-16 pointer-events-none opacity-40 dark:opacity-100" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl -translate-x-12 translate-y-12 pointer-events-none opacity-40 dark:opacity-100" />
               
               <div className="relative z-10">
-                <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-6">
+                <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-6 tracking-tight">
                   Ready to Build the Future?
                 </h2>
-                <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
+                <p className="text-xl text-slate-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
                   Join thousands of entrepreneurs who transformed their ideas into successful businesses with StratIQ.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                  <div className="flex items-center gap-2 text-green-400">
-                    <CheckCircle className="h-5 w-5" />
-                    <span>No credit card required</span>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-8">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-green-400 font-medium text-base">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 dark:text-green-400 shrink-0" />
+                    <span className="text-slate-700 dark:text-gray-200">No credit card required</span>
                   </div>
-                  <div className="flex items-center gap-2 text-green-400">
-                    <CheckCircle className="h-5 w-5" />
-                    <span>Cancel anytime</span>
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-green-400 font-medium text-base">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 dark:text-green-400 shrink-0" />
+                    <span className="text-slate-700 dark:text-gray-200">Cancel anytime</span>
                   </div>
                 </div>
                 
                 <button
                   onClick={() => openAuthModal('signup')}
-                  className="group px-12 py-4 font-bold text-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all duration-300 shadow-2xl hover:shadow-purple-500/25 inline-flex items-center gap-3 animate-pulse-slow"
+                  className="group px-12 py-4 font-bold text-lg text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all duration-300 shadow-2xl hover:shadow-purple-500/25 inline-flex items-center gap-3 animate-pulse-slow cursor-pointer"
                 >
-                  <Rocket className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                  <span>Start Your Strategy Now</span>
+                  <Rocket className="h-5 w-5 group-hover:scale-110 transition-transform text-white" />
+                  <span className="text-white font-bold">Start Your Strategy Now</span>
                 </button>
                 
-                <p className="text-gray-400 text-sm mt-4">
+                <p className="text-slate-500 dark:text-gray-400 text-sm mt-4">
                   Get started in 30 seconds
                 </p>
               </div>
@@ -355,32 +355,32 @@ const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* Compact FAQ Section (Requirement 5) */}
-        <FAQSection id="faq" className="bg-gray-900/40 border-t border-gray-800/80" />
+        <FAQSection id="faq" className="bg-slate-50/60 dark:bg-gray-900/40 border-t border-slate-200 dark:border-gray-800/80" />
 
         {/* Contact / Support Section (Requirement 3) */}
-        <section id="contact" className="py-20 bg-gray-900/80 border-t border-gray-800/80 relative">
+        <section id="contact" className="py-20 bg-slate-50/80 dark:bg-gray-900/80 border-t border-slate-200 dark:border-gray-800/80 relative">
           <div className="container mx-auto px-4 max-w-4xl">
-            <div className="bg-gradient-to-br from-gray-900 via-indigo-950/30 to-gray-900 rounded-3xl p-8 md:p-12 border border-indigo-500/20 shadow-2xl relative overflow-hidden">
-              <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="bg-gradient-to-br from-white via-indigo-50/30 to-white dark:from-gray-900 dark:via-indigo-950/30 dark:to-gray-900 rounded-3xl p-8 md:p-12 border border-slate-200 dark:border-indigo-500/20 shadow-xl dark:shadow-2xl relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none opacity-40 dark:opacity-100" />
               
               <div className="relative z-10 text-center max-w-2xl mx-auto">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-4">
-                  <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-semibold mb-4">
+                  <Mail className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>Support & Inquiries</span>
                 </div>
 
-                <h2 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+                <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                   Need help?
                 </h2>
 
-                <p className="mt-4 text-base md:text-lg text-gray-300 leading-relaxed">
+                <p className="mt-4 text-base md:text-lg text-slate-600 dark:text-gray-300 leading-relaxed">
                   We're here to help with your StratIQ account, subscriptions, payments, business strategies, and product feedback.
                 </p>
 
-                <div className="mt-8 p-5 rounded-2xl bg-gray-950/70 border border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+                <div className="mt-8 p-5 rounded-2xl bg-slate-50 dark:bg-gray-950/70 border border-slate-200 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Email Support</span>
-                    <div className="text-lg sm:text-xl font-mono font-bold text-white mt-0.5">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Email Support</span>
+                    <div className="text-lg sm:text-xl font-mono font-bold text-slate-900 dark:text-white mt-0.5">
                       {SUPPORT_EMAIL}
                     </div>
                   </div>
@@ -390,12 +390,12 @@ const LandingPage: React.FC<LandingPageProps> = ({
                     className="w-full sm:w-auto px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 shrink-0 focus:outline-none focus:ring-4 focus:ring-indigo-500/50"
                     aria-label="Contact StratIQ Support"
                   >
-                    <Mail className="w-4 h-4" />
-                    <span>Contact Support</span>
+                    <Mail className="w-4 h-4 text-white" />
+                    <span className="text-white">Contact Support</span>
                   </a>
                 </div>
 
-                <p className="mt-4 text-xs text-gray-500">
+                <p className="mt-4 text-xs text-slate-500 dark:text-gray-500">
                   Looking for comprehensive support details? Check out our{' '}
                   <a 
                     href="/support" 
@@ -405,7 +405,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                         onNavigateSupport();
                       }
                     }}
-                    className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 underline underline-offset-2 font-medium"
                   >
                     StratIQ Support Page
                   </a>

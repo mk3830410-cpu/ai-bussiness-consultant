@@ -47,6 +47,17 @@
             "advisorMessagesCount": { "type": "number" },
             "lastUpdated": { "type": "number" }
           }
+        },
+        "buildRoadmaps": {
+          "fields": {
+            "ventureName": { "type": "string" },
+            "industry": { "type": "string" },
+            "activeStageId": { "type": "string" },
+            "completedStages": { "type": "array" },
+            "stages": { "type": "map" },
+            "createdAt": { "type": "number" },
+            "updatedAt": { "type": "number" }
+          }
         }
       }
     },

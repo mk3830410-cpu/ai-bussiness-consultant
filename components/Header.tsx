@@ -22,12 +22,13 @@ import {
   ChevronDown,
   Sun,
   Moon,
-  LifeBuoy
+  LifeBuoy,
+  Rocket
 } from 'lucide-react';
 import { useAuth } from '../services/AuthContext';
 import { useTheme } from '../services/ThemeContext';
 
-export type AppNavTab = 'dashboard' | 'new_analysis' | 'saved_strategies' | 'ideas_vault' | 'advisor' | 'pricing' | 'settings' | 'support';
+export type AppNavTab = 'dashboard' | 'build_business' | 'new_analysis' | 'saved_strategies' | 'ideas_vault' | 'advisor' | 'pricing' | 'settings' | 'support';
 
 export interface HeaderProps {
   currentTab?: AppNavTab;
@@ -173,6 +174,7 @@ export const Header: React.FC<HeaderProps> = ({
   if (user) {
     const authNavItems: { id: AppNavTab; label: string; icon: React.ElementType }[] = [
       { id: 'dashboard', label: 'Command Center', icon: LayoutDashboard },
+      { id: 'build_business', label: 'Build My Business', icon: Rocket },
       { id: 'new_analysis', label: 'New Analysis', icon: Sparkles },
       { id: 'saved_strategies', label: 'Saved Strategies', icon: FolderGit2 },
       { id: 'ideas_vault', label: 'Idea Vault', icon: Lightbulb },
@@ -315,10 +317,11 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Theme Toggle Shortcut */}
               <button
-                id="header-theme-toggle-btn"
+                id="theme-toggle-btn"
+                data-testid="theme-toggle-btn"
                 onClick={toggleTheme}
                 aria-label={isDark ? "Switch to Light theme" : "Switch to Dark theme"}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/70 border border-slate-800/80 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/70 border border-slate-200 dark:border-slate-800/80 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
@@ -507,6 +510,20 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <CreditCard className="w-4 h-4 text-slate-400" />
                 <span>Subscription Plan</span>
+              </button>
+
+              <button
+                id="mobile-theme-toggle-btn"
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+                  <span>Appearance</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold uppercase">
+                  {isDark ? 'Dark' : 'Light'}
+                </span>
               </button>
               
               <button

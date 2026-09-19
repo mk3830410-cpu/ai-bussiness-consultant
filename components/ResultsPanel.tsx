@@ -20,7 +20,7 @@ import { BudgetCalculator } from './BudgetCalculator';
 import { MilestoneTimelineWidget } from './MilestoneTimelineWidget';
 import { CompetitorBubbleChart } from './CompetitorBubbleChart';
 import { WizardData } from '../types';
-import { ShieldAlert, ListOrdered, Coins, Users2, Printer, Layers, Compass, FileCode, Calculator, Calendar, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, ListOrdered, Coins, Users2, Printer, Layers, Compass, FileCode, Calculator, Calendar, ArrowLeft, Rocket } from 'lucide-react';
 import { isFounderProActive, isTeamScaleActive } from '../subscriptionConfig';
 
 // --- PDF Export Modal Component ---
@@ -100,6 +100,7 @@ interface ResultsPanelProps {
   wizardData?: WizardData | null;
   subscription?: UserSubscription;
   onUpgradePro?: () => void;
+  onLaunchBuildBusiness?: () => void;
 }
 
 interface PrintableReportProps {
@@ -440,6 +441,18 @@ const ResultsPanel: React.FC<ResultsPanelProps> = (props) => {
         <h2 className="text-3xl font-extrabold text-white mt-2">{currentMode.title}</h2>
         <p className="text-gray-400 mt-1">Your AI-powered analysis is ready.</p>
         <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5 mt-4 sm:mt-0 sm:absolute sm:top-0 sm:right-0">
+           {props.onLaunchBuildBusiness && (
+             <button
+               id="launch-build-business-btn"
+               onClick={props.onLaunchBuildBusiness}
+               className="inline-flex items-center justify-center px-4 py-2 text-xs md:text-sm font-extrabold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-indigo-600/30 transition-all gap-1.5 transform hover:scale-105"
+               title="Transfer this strategy into the 10-Stage 'Build My Business' Execution Engine"
+             >
+               <Rocket size={15} className="text-amber-300" />
+               <span>Build My Business</span>
+             </button>
+           )}
+
            <button
              id="copy-summary-btn"
              onClick={handleCopySummary}

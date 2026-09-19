@@ -32,6 +32,7 @@ import { SupportPage } from './components/SupportPage';
 import { SUPPORT_EMAIL, createSupportMailto } from './supportConfig';
 import { ConceptHistory } from './components/ConceptHistory';
 import { DashboardOverview } from './components/DashboardOverview';
+import { BuildMyBusiness } from './components/BuildMyBusiness';
 import { AnalysisWizard } from './components/AnalysisWizard';
 import { SavedStrategiesView } from './components/SavedStrategiesView';
 import { BusinessIdeasVault } from './components/BusinessIdeasVault';
@@ -99,6 +100,7 @@ const AppContent: React.FC = () => {
   const tabToPath = (tab: AppNavTab): string => {
     switch (tab) {
       case 'dashboard': return '/dashboard';
+      case 'build_business': return '/build-my-business';
       case 'new_analysis': return '/new-analysis';
       case 'saved_strategies': return '/saved-strategies';
       case 'ideas_vault': return '/idea-vault';
@@ -113,6 +115,7 @@ const AppContent: React.FC = () => {
   const pathToTab = (pathname: string): AppNavTab | null => {
     const normalized = pathname.toLowerCase().replace(/\/+$/, '') || '/';
     if (normalized === '/dashboard' || normalized === '/command-center') return 'dashboard';
+    if (normalized === '/build-my-business' || normalized === '/build-business') return 'build_business';
     if (normalized === '/new-analysis') return 'new_analysis';
     if (normalized === '/saved-strategies') return 'saved_strategies';
     if (normalized === '/idea-vault') return 'ideas_vault';
@@ -952,11 +955,26 @@ const AppContent: React.FC = () => {
               recentStrategies={savedStrategies}
               subscription={subscription}
               usage={usage}
-              onStartNewAnalysis={() => setCurrentTab('new_analysis')}
-              onOpenAdvisor={() => setCurrentTab('advisor')}
+              onStartNewAnalysis={() => handleNavigateTab('new_analysis')}
+              onOpenAdvisor={() => handleNavigateTab('advisor')}
               onOpenStrategy={handleOpenStrategy}
-              onViewAllStrategies={() => setCurrentTab('saved_strategies')}
-              onUpgradePro={() => setCurrentTab('pricing')}
+              onViewAllStrategies={() => handleNavigateTab('saved_strategies')}
+              onUpgradePro={() => handleNavigateTab('pricing')}
+              onOpenBuildBusiness={() => handleNavigateTab('build_business')}
+            />
+          )}
+
+          {/* 1.5. BUILD MY BUSINESS (10-STAGE EXECUTION ENGINE) */}
+          {currentTab === 'build_business' && (
+            <BuildMyBusiness 
+              strategy={
+                (analysisResult as StrategyResponse) ||
+                (activeStrategy?.result as StrategyResponse) ||
+                (savedStrategies[0]?.result as StrategyResponse) ||
+                null
+              }
+              wizardData={currentWizardData || activeStrategy?.inputs || null}
+              onNavigateTab={handleNavigateTab}
             />
           )}
 
@@ -1028,7 +1046,8 @@ const AppContent: React.FC = () => {
                   isCollaborative={currentPlan === 'enterprise'}
                   wizardData={currentWizardData}
                   subscription={subscription}
-                  onUpgradePro={() => setCurrentTab('pricing')}
+                  onUpgradePro={() => handleNavigateTab('pricing')}
+                  onLaunchBuildBusiness={() => handleNavigateTab('build_business')}
                 />
               )}
             </div>

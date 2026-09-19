@@ -83,6 +83,7 @@ Submitted via StratIQ App`;
 
   return (
     <div
+      id="feedback-modal"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn"
       onClick={onClose}
       role="dialog"
@@ -245,8 +246,10 @@ Submitted via StratIQ App`;
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
               <button
                 type="button"
+                id="feedback-copy-btn"
+                data-testid="feedback-copy-btn"
                 onClick={handleCopy}
-                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border border-slate-700/60"
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border border-slate-700/60 cursor-pointer"
                 title="Copy feedback to clipboard"
               >
                 {isCopied ? (
@@ -265,13 +268,16 @@ Submitted via StratIQ App`;
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
+                  id="feedback-cancel-btn"
                   onClick={onClose}
-                  className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-medium transition-colors"
+                  className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-medium transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  id="feedback-submit-email-btn"
+                  data-testid="feedback-submit-email-btn"
                   className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
                 >
                   <Mail size={14} />

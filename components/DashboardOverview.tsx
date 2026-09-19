@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Clock,
   ExternalLink,
-  HelpCircle
+  HelpCircle,
+  Rocket
 } from 'lucide-react';
 import { SavedStrategy, UserSubscription } from '../types';
 import { UserUsage } from '../subscriptionConfig';
@@ -37,6 +38,7 @@ interface DashboardOverviewProps {
   onOpenStrategy: (strategy: SavedStrategy) => void;
   onViewAllStrategies: () => void;
   onUpgradePro?: () => void;
+  onOpenBuildBusiness?: () => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -49,6 +51,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onOpenStrategy,
   onViewAllStrategies,
   onUpgradePro,
+  onOpenBuildBusiness,
 }) => {
   const isEnterpriseActive = subscription?.plan === 'enterprise' && subscription?.status === 'active';
   const isProActive = subscription?.plan === 'pro' && subscription?.status === 'active';
@@ -79,6 +82,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
+            {onOpenBuildBusiness && (
+              <button
+                onClick={onOpenBuildBusiness}
+                id="dashboard-build-business-btn"
+                className="px-6 py-3.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white font-extrabold rounded-xl text-sm transition-all duration-200 shadow-xl hover:shadow-indigo-500/40 flex items-center gap-2 transform hover:scale-105"
+              >
+                <Rocket className="w-4 h-4 text-amber-300 animate-pulse" />
+                <span>Build My Business</span>
+              </button>
+            )}
+
             <button
               onClick={onStartNewAnalysis}
               className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl text-sm transition-all duration-200 shadow-xl hover:shadow-indigo-500/30 flex items-center gap-2 transform hover:scale-105"
@@ -260,6 +274,64 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           );
         })}
+      </div>
+
+      {/* Build My Business: The 10-Stage Venture Execution Showcase */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/40 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden" id="dashboard-build-business-card">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-3 max-w-3xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold">
+              <Rocket className="w-3.5 h-3.5 text-amber-400" />
+              <span>NEW: Execution Operating System</span>
+            </div>
+
+            <h2 className="text-xl md:text-3xl font-black text-white tracking-tight">
+              Build My Business: The 10-Stage Execution Engine
+            </h2>
+
+            <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
+              Transform strategic insights into an operating business. Follow the proven 10-stage sequential playbook from problem validation to sustainable scaling.
+            </p>
+
+            {/* Visual 10-stage sequential track */}
+            <div className="pt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+              {[
+                { num: '01', name: 'Validation' },
+                { num: '02', name: 'Customer' },
+                { num: '03', name: 'Business Model' },
+                { num: '04', name: 'Pricing' },
+                { num: '05', name: 'Brand' },
+                { num: '06', name: 'Marketing' },
+                { num: '07', name: 'Operations' },
+                { num: '08', name: 'Launch' },
+                { num: '09', name: 'Customers' },
+                { num: '10', name: 'Growth' }
+              ].map((stage, idx, arr) => (
+                <React.Fragment key={stage.num}>
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700/80 text-slate-200 flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono text-indigo-400 font-bold">{stage.num}</span>
+                    <span>{stage.name}</span>
+                  </span>
+                  {idx < arr.length - 1 && (
+                    <span className="text-slate-600 font-bold text-xs hidden sm:inline">→</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          <div className="shrink-0">
+            {onOpenBuildBusiness && (
+              <button
+                onClick={onOpenBuildBusiness}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all transform hover:scale-105"
+              >
+                <span>Launch Execution Engine</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Two Column Layout: Recent Strategies + AI Advisor Quick Launcher */}

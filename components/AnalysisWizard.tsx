@@ -122,6 +122,9 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
   // Default to quick brainstorm for Starter users so they don't immediately hit a locked mode
   const [mode, setMode] = useState<AnalysisMode>(isPaidActive ? 'deep' : 'quick');
   
+  // Dedicated userInput state for startup idea and dictation
+  const [userInput, setUserInput] = useState<string>(initialData?.businessIdea || '');
+
   const [formData, setFormData] = useState<WizardData>({
     businessName: initialData?.businessName || '',
     businessIdea: initialData?.businessIdea || '',
@@ -135,6 +138,14 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
     stage: initialData?.stage || STAGES[0],
     budget: initialData?.budget || BUDGETS[0],
   });
+
+  // Sync external initialData if provided
+  useEffect(() => {
+    if (initialData?.businessIdea && initialData.businessIdea !== userInput) {
+      setUserInput(initialData.businessIdea);
+      setFormData((prev) => ({ ...prev, businessIdea: initialData.businessIdea || '' }));
+    }
+  }, [initialData?.businessIdea]);
 
   const [image, setImage] = useState<{ b64: string; mimeType: string; file: File } | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -198,10 +209,12 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
           }
         }
         if (finalTranscripts) {
-          setFormData((prev) => ({
-            ...prev,
-            businessIdea: prev.businessIdea ? `${prev.businessIdea} ${finalTranscripts}` : finalTranscripts,
-          }));
+          // Update userInput state directly as required
+          setUserInput((prev) => {
+            const updated = prev ? `${prev} ${finalTranscripts}` : finalTranscripts;
+            setFormData((f) => ({ ...f, businessIdea: updated }));
+            return updated;
+          });
         }
       };
 
@@ -265,10 +278,12 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
 
   const handleNext = () => {
     if (step === 1) {
-      if (!formData.businessIdea.trim()) {
+      const idea = userInput.trim() || formData.businessIdea.trim();
+      if (!idea) {
         alert('Please describe your startup or business idea before proceeding.');
         return;
       }
+      setFormData((prev) => ({ ...prev, businessIdea: idea }));
       setStep(2);
     } else if (step === 2) {
       setStep(3);
@@ -286,7 +301,11 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
         return;
       }
     }
-    onGenerate(formData, mode, image);
+    const finalData = {
+      ...formData,
+      businessIdea: userInput.trim() || formData.businessIdea.trim(),
+    };
+    onGenerate(finalData, mode, image);
   };
 
   return (
@@ -414,8 +433,10 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
 
               <button
                 type="button"
+                id="wizard-mic-btn"
+                data-testid="wizard-mic-btn"
                 onClick={toggleListening}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   isListening
                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse shadow-sm shadow-rose-900/40'
                     : 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 hover:text-white border border-indigo-500/30'
@@ -460,15 +481,20 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
             )}
 
             <textarea
+              id="wizard-business-idea-input"
               rows={4}
-              value={formData.businessIdea}
-              onChange={(e) => setFormData({ ...formData, businessIdea: e.target.value })}
+              value={userInput}
+              onChange={(e) => {
+                const val = e.target.value;
+                setUserInput(val);
+                setFormData((prev) => ({ ...prev, businessIdea: val }));
+              }}
               placeholder="Describe what your startup does, what problem it solves, what makes it unique, and how it delivers value to users..."
               className="w-full bg-gray-900 border border-gray-700 rounded-xl p-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed"
             />
             <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
               <span>Be as specific as possible for more accurate market and financial models.</span>
-              <span>{formData.businessIdea.length} characters</span>
+              <span>{userInput.length} characters</span>
             </div>
           </div>
 
