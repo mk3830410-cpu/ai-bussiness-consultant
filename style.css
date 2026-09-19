@@ -306,9 +306,32 @@ html.light .text-zinc-500 {
   color: #64748b !important;
 }
 
-/* Standalone text-white on light surfaces */
-html.light .text-white:not(button):not(button *):not([class*="bg-indigo-6"]):not([class*="bg-indigo-5"]):not([class*="bg-purple-6"]):not([class*="bg-emerald-6"]):not([class*="bg-rose-6"]):not([class*="from-indigo-6"]):not([class*="from-purple-6"]):not([class*="bg-slate-900"]):not(.pitch-slide-title):not(.presentation-white) {
-  color: #0f172a;
+/* Standalone text-white on light surfaces must map to deep slate for high contrast */
+html.light .text-white:not(button.bg-indigo-600):not(button.bg-indigo-600 *):not(button.bg-indigo-500):not(button.bg-indigo-500 *):not(button.bg-purple-600):not(button.bg-purple-600 *):not(button.bg-emerald-600):not(button.bg-emerald-600 *):not(button.bg-rose-600):not(button.bg-rose-600 *):not(button.bg-red-600):not(button.bg-red-600 *):not(.bg-indigo-600):not(.bg-indigo-600 *):not(.bg-indigo-500):not(.bg-indigo-500 *):not(.bg-purple-600):not(.bg-purple-600 *):not(.bg-emerald-600):not(.bg-emerald-600 *):not(.bg-rose-600):not(.bg-rose-600 *):not([class*="bg-gradient-to"][class*="from-indigo-6"]):not([class*="bg-gradient-to"][class*="from-indigo-6"] *):not([class*="bg-gradient-to"][class*="from-purple-6"]):not([class*="bg-gradient-to"][class*="from-purple-6"] *):not([data-preserve-white="true"]):not([data-preserve-white="true"] *) {
+  color: #0f172a !important;
+}
+
+/* Neutral buttons, tabs, accordions & outline controls in light mode */
+html.light button.bg-slate-800,
+html.light button.bg-slate-800 *,
+html.light button.bg-slate-900,
+html.light button.bg-slate-900 *,
+html.light button.bg-slate-700,
+html.light button.bg-slate-700 *,
+html.light button.bg-gray-800,
+html.light button.bg-gray-800 *,
+html.light button.bg-gray-700,
+html.light button.bg-gray-700 *,
+html.light button.bg-zinc-800,
+html.light button.bg-zinc-800 *,
+html.light button.bg-zinc-700,
+html.light button.bg-zinc-700 * {
+  color: #0f172a !important;
+}
+
+/* Ensure hover:text-white on neutral buttons or anchors turns dark in light mode */
+html.light .hover\:text-white:not(button[class*="bg-indigo-"]):not(button[class*="bg-purple-"]):not(button[class*="bg-emerald-"]):not(button[class*="bg-rose-"]):hover {
+  color: #0f172a !important;
 }
 
 /* Accordion buttons, disclosure triggers, card buttons and outline buttons in light mode must show dark text */
@@ -470,24 +493,64 @@ html.light .text-red-400 {
   color: #dc2626 !important;
 }
 
+/* Ensure all Lucide and SVG icons inherit high-contrast functional colors */
+html.light svg.text-slate-400,
+html.light .text-slate-400 svg,
+html.light svg.text-gray-400,
+html.light .text-gray-400 svg {
+  color: #475569 !important;
+}
+html.light svg.text-slate-500,
+html.light .text-slate-500 svg,
+html.light svg.text-gray-500,
+html.light .text-gray-500 svg {
+  color: #334155 !important;
+}
+html.light svg.text-indigo-400,
+html.light .text-indigo-400 svg {
+  color: #4f46e5 !important;
+}
+html.light svg.text-purple-400,
+html.light .text-purple-400 svg {
+  color: #7c3aed !important;
+}
+html.light svg.text-emerald-400,
+html.light .text-emerald-400 svg {
+  color: #059669 !important;
+}
+html.light svg.text-amber-400,
+html.light .text-amber-400 svg {
+  color: #b45309 !important;
+}
+
 /* Background Images, Avatars, and Logos contrast on light surfaces */
 html.light img[alt*="Avatar"],
 html.light img[alt*="Logo"],
 html.light img[alt*="Generated Logo"],
-html.light img[alt*="Company Logo"] {
+html.light img[alt*="Company Logo"],
+html.light img.rounded-full,
+html.light img.rounded-xl {
   border-color: #cbd5e1 !important;
   background-color: #ffffff !important;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Visual overlays & background image protection in light mode */
-html.light [style*="background-image"]:not([class*="from-"]):not([class*="to-"]) {
-  filter: contrast(1.05);
+html.light [style*="background-image"]:not([class*="from-"]):not([class*="to-"]),
+html.light [style*="backgroundImage"]:not([class*="from-"]):not([class*="to-"]) {
+  filter: contrast(1.08) saturate(1.05);
+}
+
+/* Adapt mix-blend-mode screen on light surfaces to preserve visibility of AI background images */
+html.light [style*="mixBlendMode"],
+html.light [style*="mix-blend-mode"] {
+  mix-blend-mode: normal !important;
+  opacity: 0.75 !important;
 }
 
 html.light div[style*="radial-gradient"] {
-  opacity: 0.65;
-  filter: saturate(1.2);
+  opacity: 0.45;
+  filter: saturate(1.1);
 }
 
 /* Ambient glow accent moderation in light mode */
@@ -495,13 +558,19 @@ html.light [class*="bg-indigo-600\/10"],
 html.light [class*="bg-indigo-600\/15"],
 html.light [class*="bg-purple-600\/10"],
 html.light [class*="bg-purple-600\/15"] {
-  opacity: 0.45 !important;
+  opacity: 0.35 !important;
 }
 
 /* Landing Page & Hero text gradient in light mode */
-html.light .from-white.to-gray-300 {
+html.light .from-white.to-gray-300,
+html.light .from-white.to-gray-200,
+html.light .from-white.to-gray-100 {
   --tw-gradient-from: #0f172a var(--tw-gradient-from-position) !important;
   --tw-gradient-to: #334155 var(--tw-gradient-to-position) !important;
+}
+
+html.light h1.bg-clip-text.text-transparent {
+  color: transparent !important;
 }
 
 /* D3 and SVG charts readability in light mode */

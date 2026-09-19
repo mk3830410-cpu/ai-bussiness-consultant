@@ -30,7 +30,7 @@
               }
             },
             transitionProperty: {
-              'theme': 'background-color, border-color, color, fill, stroke, box-shadow',
+              'theme': 'background-color, border-color, color, fill, stroke, box-shadow, opacity',
             },
             transitionDuration: {
               'theme': '300ms',
@@ -41,6 +41,23 @@
           }
         }
       };
+    </script>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('stratiq_theme');
+          var isLight = saved === 'light' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+          if (isLight) {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+            document.documentElement.setAttribute('data-theme', 'light');
+          } else {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

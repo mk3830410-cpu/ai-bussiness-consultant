@@ -17,11 +17,22 @@ import {
   Clock,
   Sparkles,
   ArrowLeftRight,
-  FileCode
+  FileCode,
+  Archive,
+  DownloadCloud,
+  CheckSquare,
+  Square,
+  Lock,
+  Crown,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { SavedStrategy } from '../types';
 import { StrategyComparison } from './StrategyComparison';
 import { downloadStrategyMarkdown } from '../services/markdownExportService';
+import { useAuth } from '../services/AuthContext';
+import { useToast } from './Toast';
+import { exportSavedStrategiesToZip, BulkExportProgress } from '../services/bulkExportService';
 
 interface SavedStrategiesViewProps {
   strategies: SavedStrategy[];
@@ -32,6 +43,7 @@ interface SavedStrategiesViewProps {
   onDuplicateStrategy?: (id: string) => void;
   onCreateNew: () => void;
   onExportPdf?: (strategy: SavedStrategy) => void;
+  onUpgradePro?: () => void;
 }
 
 export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
@@ -43,7 +55,11 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
   onDuplicateStrategy,
   onCreateNew,
   onExportPdf,
+  onUpgradePro,
 }) => {
+  const { user, isPro } = useAuth();
+  const { showToast } = useToast();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -51,6 +67,12 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
   const [comparing, setComparing] = useState(false);
   const [compareInitialA, setCompareInitialA] = useState<string | undefined>();
   const [compareInitialB, setCompareInitialB] = useState<string | undefined>();
+
+  // Bulk ZIP Export states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [exportProgress, setExportProgress] = useState<BulkExportProgress | null>(null);
+  const [showProUpgradeModal, setShowProUpgradeModal] = useState(false);
 
   const filtered = (strategies || []).filter((item): item is SavedStrategy => {
     if (!item) return false;
@@ -66,6 +88,64 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
     const matchesStatus = statusFilter === 'all' || itemStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleToggleSelectStrategy = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((s) => s.id)));
+    }
+  };
+
+  const handleTriggerBulkExport = async (customSelection?: SavedStrategy[]) => {
+    const targets = customSelection || (
+      selectedIds.size > 0 
+        ? strategies.filter((s) => selectedIds.has(s.id))
+        : strategies
+    );
+
+    if (targets.length === 0) {
+      showToast('No saved strategies available to export.', 'info');
+      return;
+    }
+
+    // Check if user is Pro
+    if (!isPro) {
+      setShowProUpgradeModal(true);
+      return;
+    }
+
+    try {
+      showToast(`Compiling ${targets.length} strategy reports into ZIP archive...`, 'info');
+      await exportSavedStrategiesToZip(targets, {
+        userEmail: user?.email,
+        onProgress: (p) => setExportProgress(p),
+      });
+      showToast(`ZIP export complete! Downloaded ${targets.length} strategy PDFs.`, 'success');
+      setTimeout(() => {
+        setExportProgress(null);
+        setIsSelectionMode(false);
+        setSelectedIds(new Set());
+      }, 1500);
+    } catch (err: any) {
+      console.error('Bulk export failed:', err);
+      showToast(`Export failed: ${err?.message || 'Error generating archive'}`, 'error');
+      setExportProgress(null);
+    }
+  };
 
   const handleStartRename = (strategy: SavedStrategy, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -130,7 +210,47 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {strategies.length > 0 && (
+            <button
+              id="bulk-export-zip-btn"
+              onClick={() => handleTriggerBulkExport()}
+              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-md hover:shadow-purple-500/25 flex items-center gap-2 shrink-0 cursor-pointer"
+              title={isPro ? "Download all saved strategies as a single ZIP of PDFs" : "Pro Feature: Bulk export all strategies as a single ZIP archive"}
+            >
+              <Archive className="w-4 h-4 text-white" />
+              <span>Bulk Export (ZIP)</span>
+              {!isPro ? (
+                <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-black uppercase tracking-wider border border-amber-400/40 flex items-center gap-1">
+                  <Crown className="w-2.5 h-2.5 text-amber-300" />
+                  PRO
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/40">
+                  {selectedIds.size > 0 ? `${selectedIds.size}` : `${strategies.length}`}
+                </span>
+              )}
+            </button>
+          )}
+
+          {strategies.length > 0 && (
+            <button
+              onClick={() => {
+                setIsSelectionMode(!isSelectionMode);
+                if (isSelectionMode) setSelectedIds(new Set());
+              }}
+              className={`px-3.5 py-2.5 rounded-xl border text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                isSelectionMode 
+                  ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500' 
+                  : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-300 hover:text-white'
+              }`}
+              title="Toggle multi-strategy selection"
+            >
+              <CheckSquare className="w-4 h-4 text-indigo-400" />
+              <span className="hidden sm:inline">{isSelectionMode ? 'Cancel Selection' : 'Select'}</span>
+            </button>
+          )}
+
           {strategies.length >= 2 && (
             <button
               onClick={() => {
@@ -155,6 +275,45 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Selection Mode Toolbar */}
+      {isSelectionMode && (
+        <div className="bg-indigo-950/40 border border-indigo-500/40 rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 animate-fadeIn shadow-lg shadow-indigo-950/20">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSelectAll}
+              className="text-xs font-bold text-indigo-300 hover:text-white flex items-center gap-1.5 cursor-pointer bg-indigo-900/40 hover:bg-indigo-900/70 border border-indigo-500/30 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {selectedIds.size === filtered.length && filtered.length > 0 ? (
+                <>
+                  <CheckSquare className="w-4 h-4 text-indigo-400" />
+                  <span>Deselect All</span>
+                </>
+              ) : (
+                <>
+                  <Square className="w-4 h-4 text-slate-400" />
+                  <span>Select All ({filtered.length})</span>
+                </>
+              )}
+            </button>
+            <span className="text-xs text-slate-500">•</span>
+            <span className="text-xs font-bold text-slate-200">
+              {selectedIds.size} of {filtered.length} selected
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              disabled={selectedIds.size === 0}
+              onClick={() => handleTriggerBulkExport()}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>Export {selectedIds.size > 0 ? `${selectedIds.size} Selected` : 'Selection'} as ZIP</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Controls: Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -212,18 +371,46 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
             const createdAtDate = strategy?.createdAt ? new Date(strategy.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent';
             const updatedAtDate = strategy?.updatedAt ? new Date(strategy.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : createdAtDate;
 
+            const isSelected = selectedIds.has(strategy.id);
+
             return (
               <div
                 key={strategy.id}
-                onClick={() => onOpenStrategy(strategy)}
-                className="bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between group"
+                onClick={() => {
+                  if (isSelectionMode) {
+                    handleToggleSelectStrategy(strategy.id);
+                  } else {
+                    onOpenStrategy(strategy);
+                  }
+                }}
+                className={`bg-slate-900/90 hover:bg-slate-900 border rounded-2xl p-6 transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between group ${
+                  isSelected
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-950/30'
+                    : 'border-slate-800 hover:border-indigo-500/50'
+                }`}
               >
                 <div>
                   {/* Top Badges */}
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-950 text-slate-300 border border-slate-800 truncate max-w-[150px]">
-                      {strategy.industry}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {isSelectionMode && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleSelectStrategy(strategy.id, e)}
+                          className="p-1 rounded text-slate-400 hover:text-white cursor-pointer transition-colors"
+                          aria-label="Select strategy for bulk export"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-indigo-400 fill-indigo-500/20" />
+                          ) : (
+                            <Square className="w-5 h-5 text-slate-500 hover:text-slate-300" />
+                          )}
+                        </button>
+                      )}
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-950 text-slate-300 border border-slate-800 truncate max-w-[150px]">
+                        {strategy.industry}
+                      </span>
+                    </div>
 
                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusInfo.bg}`}>
                       {statusInfo.label}
@@ -385,6 +572,124 @@ export const SavedStrategiesView: React.FC<SavedStrategiesViewProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pro Upgrade Required Modal for Bulk Export */}
+      {showProUpgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative">
+            <button
+              onClick={() => setShowProUpgradeModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 mb-4">
+              <Archive className="w-6 h-6 text-purple-300" />
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-extrabold uppercase tracking-wider mb-2">
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>Founder Pro Feature</span>
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-black text-white">
+              Bulk PDF ZIP Export
+            </h3>
+            <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+              Export all your saved strategy blueprints into a single organized ZIP package of investor-ready PDFs with an automated portfolio manifest.
+            </p>
+
+            <div className="mt-5 space-y-2.5 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>One-click bundle download of all your analyzed startups</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Executive portfolio manifest text file with scores & dates</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>High-resolution PDF formatting ready for investor review</span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowProUpgradeModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowProUpgradeModal(false);
+                  if (onUpgradePro) {
+                    onUpgradePro();
+                  } else {
+                    showToast('Please visit the Pricing tab to upgrade to Founder Pro.', 'info');
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black transition-all shadow-lg hover:shadow-purple-500/25 flex items-center gap-2 cursor-pointer"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-300" />
+                <span>Upgrade to Pro</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Progress Modal */}
+      {exportProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mx-auto">
+              <Loader2 className="w-7 h-7 text-indigo-400 animate-spin" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-extrabold text-white">
+                {exportProgress.status === 'zipping'
+                  ? 'Compressing ZIP Archive...'
+                  : 'Compiling Strategy PDFs...'}
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                {exportProgress.currentName}
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden p-0.5">
+              <div
+                className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${Math.round(
+                    (exportProgress.current / Math.max(exportProgress.total, 1)) * 100
+                  )}%`,
+                }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+              <span>
+                Processed {exportProgress.current} of {exportProgress.total} reports
+              </span>
+              <span className="text-indigo-400 font-bold">
+                {Math.round(
+                  (exportProgress.current / Math.max(exportProgress.total, 1)) * 100
+                )}
+                %
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 italic">
+              Please keep this tab open while generating high-res vector PDFs...
+            </p>
+          </div>
         </div>
       )}
     </div>

@@ -15,12 +15,12 @@ interface PdfExportOptions {
   conceptTitle?: string;
 }
 
-export const exportStrategyToPdf = async ({
+export const buildStrategyPdfDoc = ({
   result,
   mode,
   logoImageUrl,
   conceptTitle = 'StratIQ Business Strategy Report',
-}: PdfExportOptions): Promise<void> => {
+}: PdfExportOptions): jsPDF => {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -489,7 +489,16 @@ export const exportStrategyToPdf = async ({
   // Add footer to last page
   addFooter();
 
-  // Save the PDF
-  const sanitizedTitle = conceptTitle.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 35);
-  doc.save(`StratIQ_${sanitizedTitle}_${mode}.pdf`);
+  return doc;
+};
+
+export const exportStrategyToPdf = async (options: PdfExportOptions): Promise<void> => {
+  const doc = buildStrategyPdfDoc(options);
+  const sanitizedTitle = (options.conceptTitle || 'Strategy').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 35);
+  doc.save(`StratIQ_${sanitizedTitle}_${options.mode}.pdf`);
+};
+
+export const generateStrategyPdfBlob = async (options: PdfExportOptions): Promise<Blob> => {
+  const doc = buildStrategyPdfDoc(options);
+  return doc.output('blob');
 };

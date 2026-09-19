@@ -1064,6 +1064,7 @@ const AppContent: React.FC = () => {
               onDuplicateStrategy={handleDuplicateStrategy}
               onCreateNew={() => setCurrentTab('new_analysis')}
               onExportPdf={handleExportStrategyPdf}
+              onUpgradePro={() => setCurrentTab('pricing')}
             />
           )}
 

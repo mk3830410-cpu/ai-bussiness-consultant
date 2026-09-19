@@ -55,8 +55,10 @@ import {
   Layers, 
   FileText,
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  Milestone
 } from 'lucide-react';
+import { ProjectRoadmapTracker } from './ProjectRoadmapTracker';
 
 interface BuildMyBusinessProps {
   strategy?: StrategyResponse | null;
@@ -87,6 +89,7 @@ export const BuildMyBusiness: FC<BuildMyBusinessProps> = ({
   const [activeViewMode, setActiveViewMode] = useState<'interactive' | 'output'>('interactive');
   const [copiedStageOutput, setCopiedStageOutput] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showRoadmapTracker, setShowRoadmapTracker] = useState(true);
 
   // Load from local/remote on mount
   useEffect(() => {
@@ -271,6 +274,19 @@ export const BuildMyBusiness: FC<BuildMyBusinessProps> = ({
             )}
 
             <button
+              onClick={() => setShowRoadmapTracker(!showRoadmapTracker)}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                showRoadmapTracker
+                  ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-300 ring-1 ring-indigo-500/40'
+                  : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+              }`}
+              title="Toggle Project Roadmap & Milestone Tracker"
+            >
+              <Milestone className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{showRoadmapTracker ? 'Hide Roadmap Chart' : 'Milestone Roadmap'}</span>
+            </button>
+
+            <button
               onClick={handleExportFullBlueprint}
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
               title="Download full 10-stage execution blueprint as Markdown"
@@ -350,6 +366,16 @@ export const BuildMyBusiness: FC<BuildMyBusinessProps> = ({
           })}
         </div>
       </div>
+
+      {/* Recharts Project Roadmap & Milestone Progression Tracker */}
+      {showRoadmapTracker && (
+        <ProjectRoadmapTracker
+          roadmap={roadmap}
+          activeStageId={activeStageId}
+          onSelectStage={handleSelectStage}
+          onToggleStatus={handleToggleStageStatus}
+        />
+      )}
 
       {/* 3. Stage Content Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-8 shadow-xl">

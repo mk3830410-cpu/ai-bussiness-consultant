@@ -154,6 +154,8 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [interimTranscript, setInterimTranscript] = useState<string>('');
+  const [speechLang, setSpeechLang] = useState<string>('en-US');
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -184,15 +186,17 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
         } catch {}
       }
       setIsListening(false);
+      setInterimTranscript('');
       return;
     }
 
     try {
       setSpeechError(null);
+      setInterimTranscript('');
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      recognition.lang = speechLang || 'en-US';
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -200,16 +204,27 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
 
       recognition.onresult = (event: any) => {
         let finalTranscripts = '';
+        let currentInterim = '';
+
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            const transcript = event.results[i][0].transcript.trim();
+          const item = event.results[i];
+          if (item.isFinal) {
+            const transcript = item[0].transcript.trim();
             if (transcript) {
               finalTranscripts += (finalTranscripts ? ' ' : '') + transcript;
             }
+          } else {
+            currentInterim += item[0].transcript;
           }
         }
+
+        if (currentInterim) {
+          setInterimTranscript(currentInterim);
+        }
+
         if (finalTranscripts) {
-          // Update userInput state directly as required
+          setInterimTranscript('');
+          // Update userInput state directly
           setUserInput((prev) => {
             const updated = prev ? `${prev} ${finalTranscripts}` : finalTranscripts;
             setFormData((f) => ({ ...f, businessIdea: updated }));
@@ -226,10 +241,12 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
           setSpeechError(`Speech error: ${event.error}`);
         }
         setIsListening(false);
+        setInterimTranscript('');
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        setInterimTranscript('');
       };
 
       recognitionRef.current = recognition;
@@ -238,6 +255,7 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
       console.error('Failed to initialize speech recognition:', err);
       setSpeechError('Could not access microphone.');
       setIsListening(false);
+      setInterimTranscript('');
     }
   };
 
@@ -431,39 +449,74 @@ export const AnalysisWizard: React.FC<AnalysisWizardProps> = ({
                 Business Idea & Value Proposition <span className="text-indigo-400">*</span>
               </label>
 
-              <button
-                type="button"
-                id="wizard-mic-btn"
-                data-testid="wizard-mic-btn"
-                onClick={toggleListening}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  isListening
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse shadow-sm shadow-rose-900/40'
-                    : 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 hover:text-white border border-indigo-500/30'
-                }`}
-                title={isListening ? 'Click to stop listening' : 'Dictate your startup idea using your microphone'}
-              >
-                {isListening ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping mr-0.5" />
-                    <MicOff className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Listening... (Stop)</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Dictate Idea</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={speechLang}
+                  onChange={(e) => setSpeechLang(e.target.value)}
+                  className="bg-gray-800 text-[11px] text-gray-300 border border-gray-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  title="Dictation Language"
+                >
+                  <option value="en-US">English (US)</option>
+                  <option value="en-GB">English (UK)</option>
+                  <option value="es-ES">Spanish</option>
+                  <option value="fr-FR">French</option>
+                  <option value="de-DE">German</option>
+                </select>
+
+                <button
+                  type="button"
+                  id="wizard-mic-btn"
+                  data-testid="wizard-mic-btn"
+                  onClick={toggleListening}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    isListening
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse shadow-sm shadow-rose-900/40'
+                      : 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 hover:text-white border border-indigo-500/30'
+                  }`}
+                  title={isListening ? 'Click to stop listening' : 'Dictate your startup idea using your microphone'}
+                >
+                  {isListening ? (
+                    <>
+                      <div className="flex items-center gap-0.5 mr-0.5">
+                        <span className="w-1 h-3 bg-rose-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                        <span className="w-1 h-4 bg-rose-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                        <span className="w-1 h-2 bg-rose-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                      </div>
+                      <MicOff className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Stop Listening</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Dictate Idea</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {isListening && (
-              <div className="flex items-center gap-2 p-2.5 bg-rose-950/30 border border-rose-500/30 rounded-xl mb-2.5 animate-fadeIn">
-                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0"></span>
-                <p className="text-xs text-rose-200 font-medium leading-tight">
-                  Microphone active. Speak your business idea clearly — speech will transcribe into the box in real-time.
-                </p>
+              <div className="p-3 bg-rose-950/30 border border-rose-500/40 rounded-xl mb-2.5 animate-fadeIn space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                    <p className="text-xs text-rose-200 font-bold">
+                      Microphone active — speak clearly to dictate your concept
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className="text-[11px] font-semibold text-rose-300 hover:text-white underline cursor-pointer"
+                  >
+                    Done Speaking
+                  </button>
+                </div>
+                {interimTranscript && (
+                  <p className="text-xs text-rose-100 italic bg-rose-900/30 border border-rose-500/30 rounded-lg p-2 font-mono">
+                    "{interimTranscript}"
+                  </p>
+                )}
               </div>
             )}
 
