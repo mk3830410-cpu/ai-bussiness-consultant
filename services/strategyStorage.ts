@@ -253,7 +253,7 @@ export const getBusinessIdeas = (userId?: string): BusinessIdeaItem[] => {
           title: 'Decentralized Peer-to-Peer Pet Sitting',
           description: 'A verified neighborhood pet sitting exchange with automated insurance escrows and smart pet biometric check-ins.',
           industry: 'PetCare & Marketplace',
-          tags: ['Marketplace', 'Trust & Safety', 'Mobile'],
+          tags: ['Marketplace', 'Mobile App', 'Consumer'],
           createdAt: Date.now() - 86400000 * 5,
           status: 'new',
         },
@@ -262,10 +262,28 @@ export const getBusinessIdeas = (userId?: string): BusinessIdeaItem[] => {
           title: 'Autonomous Cold-Email Personalizer for B2B Agencies',
           description: 'Deep-scrapes prospect LinkedIn posts, GitHub activity, and company earnings transcripts to write hyper-personalized 1-to-1 outreach emails.',
           industry: 'SaaS & Software',
-          tags: ['B2B', 'AI', 'Sales'],
+          tags: ['SaaS', 'B2B', 'AI'],
           createdAt: Date.now() - 86400000 * 1,
           status: 'validated',
         },
+        {
+          id: 'idea_4',
+          title: 'Embedded Invoice Factoring for Creators',
+          description: 'Instant automated cash advance infrastructure that integrates with Stripe, YouTube, and TikTok creator payouts using real-time predictive analytics.',
+          industry: 'Fintech',
+          tags: ['Fintech', 'SaaS', 'Creator Economy'],
+          createdAt: Date.now() - 86400000 * 2,
+          status: 'exploring',
+        },
+        {
+          id: 'idea_5',
+          title: 'Pocket CFO Mobile App for Solopreneurs',
+          description: 'Native mobile app providing real-time cashflow forecasting, automated tax withholding alerts, and expense anomaly detection with receipt camera scanning.',
+          industry: 'Fintech',
+          tags: ['Mobile App', 'Fintech', 'SaaS'],
+          createdAt: Date.now() - 86400000 * 4,
+          status: 'new',
+        }
       ];
       localStorage.setItem(key, JSON.stringify(initial));
       return initial;
